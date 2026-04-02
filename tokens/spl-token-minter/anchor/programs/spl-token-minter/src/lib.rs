@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 pub mod instructions;
 use instructions::*;
 
-declare_id!("3of89Z9jwek9zrFgpCWc9jZvQvitpVMxpZNsrAD2vQUD");
+declare_id!("Fbeqru4ae7j2qqXJWcmRgMe6jTPFT3wFFVBwNdMLXu3i");
 
 #[program]
 pub mod spl_token_minter {

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("Bi5N7SUQhpGknVcqPTzdFFVueQoxoUu8YTLz75J6fT8A");
+declare_id!("J2evFNniYpwmUXZB7c6MKKp2KoMUdokGoLrCqr1isimv");
 
 // automatically generate module using program idl found in ./idls
 declare_program!(lever);

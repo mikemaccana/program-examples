@@ -13,7 +13,7 @@ pub use instructions::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("3ku1ZEGvBEEfhaYsAzBZuecTPEa58ZRhoVqHVGpGxVGi");
+declare_id!("7v2GHQF8LWq7YqcvToSCmqxz2Wq5hkoQg1sPV87T8zaz");
 
 #[program]
 pub mod abl_token {

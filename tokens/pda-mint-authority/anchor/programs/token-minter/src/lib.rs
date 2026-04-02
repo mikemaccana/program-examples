@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use instructions::*;
 pub mod instructions;
 
-declare_id!("3LFrPHqwk5jMrmiz48BFj6NV2k4NjobgTe1jChzx3JGD");
+declare_id!("85XkYrBfqtHfnBG8XyorbAxL8Y7WVarvcJ4Xc621dKka");
 
 #[program]
 pub mod token_minter {

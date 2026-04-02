@@ -13,7 +13,7 @@ use anchor_spl::{
         Mint, Token2022,
     },
 };
-declare_id!("AcfQLsYKuzprcCNH1n96pKKgAbAnZchwpbr3gbVN742n");
+declare_id!("CmY6ojdX7368DTxorm8ZpcKzMcL1iwG1v2qffePqqYf");
 
 #[program]
 pub mod mint_close_authority {

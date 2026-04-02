@@ -6,14 +6,14 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-hand = "Bi5N7SUQhpGknVcqPTzdFFVueQoxoUu8YTLz75J6fT8A"
-lever = "E64FVeubGC4NPNF2UBJYX4AkrVowf74fRJD9q6YhwstN"
-
-# [registry] section removed — no longer used in Anchor 1.0
+hand = "J2evFNniYpwmUXZB7c6MKKp2KoMUdokGoLrCqr1isimv"
+lever = "DtTrqnZarZotfvsaQpN4ae8CjCQEmcuLuACfNuD9Jjzg"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "pnpm ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "cargo test"
+
+[hooks]

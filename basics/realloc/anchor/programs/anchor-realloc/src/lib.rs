@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("Fod47xKXjdHVQDzkFPBvfdWLm8gEAV4iMSXkfUzCHiSD");
+declare_id!("EK1tkUzyhA3M5BP4aVCFBTSpC4mw8WL5XCjXzApEzejv");
 
 #[program]
 pub mod anchor_realloc {

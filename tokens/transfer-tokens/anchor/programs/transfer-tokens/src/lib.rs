@@ -4,7 +4,7 @@ pub mod instructions;
 
 use instructions::*;
 
-declare_id!("nHi9DdNjuupjQ3c8AJU9sChB5gLbZvTLsJQouY4hU67");
+declare_id!("FwkEu2VajLaS9kmzJHy5M46zgCMMtxgJzCSHcCaiJgtz");
 
 #[program]
 pub mod transfer_tokens {
