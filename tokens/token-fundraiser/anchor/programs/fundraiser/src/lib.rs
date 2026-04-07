@@ -16,26 +16,18 @@ pub mod fundraiser {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, amount: u64, duration: u16) -> Result<()> {
-        ctx.accounts.initialize(amount, duration, &ctx.bumps)?;
-
-        Ok(())
+        initialize::handler(ctx, amount, duration)
     }
 
     pub fn contribute(ctx: Context<Contribute>, amount: u64) -> Result<()> {
-        ctx.accounts.contribute(amount)?;
-
-        Ok(())
+        contribute::handler(ctx, amount)
     }
 
     pub fn check_contributions(ctx: Context<CheckContributions>) -> Result<()> {
-        ctx.accounts.check_contributions()?;
-
-        Ok(())
+        checker::handler(ctx)
     }
 
     pub fn refund(ctx: Context<Refund>) -> Result<()> {
-        ctx.accounts.refund()?;
-
-        Ok(())
+        refund::handler(ctx)
     }
 }

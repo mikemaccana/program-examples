@@ -34,6 +34,10 @@ pub struct Switch<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<Switch>, on: bool) -> Result<()> {
+    ctx.accounts.switch(on)
+}
+
 impl<'info> Switch<'info> {
     pub fn switch(&mut self, on: bool) -> Result<()> {
         // toggle switch on/off for the given wallet

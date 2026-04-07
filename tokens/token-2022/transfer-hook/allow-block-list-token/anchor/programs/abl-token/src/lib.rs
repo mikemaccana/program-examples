@@ -21,31 +21,31 @@ pub mod abl_token {
     use super::*;
 
     pub fn init_mint(ctx: Context<InitMint>, args: InitMintArgs) -> Result<()> {
-        ctx.accounts.init_mint(args)
+        init_mint::handler(ctx, args)
     }
 
     pub fn init_config(ctx: Context<InitConfig>) -> Result<()> {
-        ctx.accounts.init_config(ctx.bumps.config)
+        init_config::handler(ctx)
     }
 
     pub fn attach_to_mint(ctx: Context<AttachToMint>) -> Result<()> {
-        ctx.accounts.attach_to_mint()
+        attach_to_mint::handler(ctx)
     }
 
     #[instruction(discriminator = ExecuteInstruction::SPL_DISCRIMINATOR_SLICE)]
     pub fn tx_hook(ctx: Context<TxHook>, amount: u64) -> Result<()> {
-        ctx.accounts.tx_hook(amount)
+        tx_hook::handler(ctx, amount)
     }
 
     pub fn init_wallet(ctx: Context<InitWallet>, args: InitWalletArgs) -> Result<()> {
-        ctx.accounts.init_wallet(args)
+        init_wallet::handler(ctx, args)
     }
 
     pub fn remove_wallet(ctx: Context<RemoveWallet>) -> Result<()> {
-        ctx.accounts.remove_wallet()
+        remove_wallet::handler(ctx)
     }
 
     pub fn change_mode(ctx: Context<ChangeMode>, args: ChangeModeArgs) -> Result<()> {
-        ctx.accounts.change_mode(args)
+        change_mode::handler(ctx, args)
     }
 }

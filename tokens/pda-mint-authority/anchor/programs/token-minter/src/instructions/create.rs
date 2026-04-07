@@ -45,7 +45,7 @@ pub struct CreateToken<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn create_token(
+pub fn handler(
     ctx: Context<CreateToken>,
     token_name: String,
     token_symbol: String,

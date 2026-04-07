@@ -11,7 +11,7 @@ use crate::{
     state::Pool,
 };
 
-pub fn deposit_liquidity(
+pub fn handler(
     ctx: Context<DepositLiquidity>,
     amount_a: u64,
     amount_b: u64,

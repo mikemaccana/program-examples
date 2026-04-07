@@ -19,7 +19,7 @@ pub struct InitRentVault<'info> {
 
 // When lamports are transferred to a new address (without and existing account),
 // An account owned by the system program is created by default
-pub fn init_rent_vault(ctx: Context<InitRentVault>, fund_lamports: u64) -> Result<()> {
+pub fn handler(ctx: Context<InitRentVault>, fund_lamports: u64) -> Result<()> {
     transfer(
         CpiContext::new(
             ctx.accounts.system_program.key(),

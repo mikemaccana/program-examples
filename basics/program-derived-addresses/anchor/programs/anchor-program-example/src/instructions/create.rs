@@ -20,7 +20,7 @@ pub struct CreatePageVisits<'info> {
     system_program: Program<'info, System>,
 }
 
-pub fn create_page_visits(ctx: Context<CreatePageVisits>) -> Result<()> {
+pub fn handler(ctx: Context<CreatePageVisits>) -> Result<()> {
     *ctx.accounts.page_visits = PageVisits {
         page_visits: 0,
         bump: ctx.bumps.page_visits,

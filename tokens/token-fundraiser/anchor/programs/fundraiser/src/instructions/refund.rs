@@ -51,6 +51,11 @@ pub struct Refund<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<Refund>) -> Result<()> {
+    ctx.accounts.refund()?;
+    Ok(())
+}
+
 impl<'info> Refund<'info> {
     pub fn refund(&mut self) -> Result<()> {
 

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{errors::*, state::Amm};
 
-pub fn create_amm(ctx: Context<CreateAmm>, id: Pubkey, fee: u16) -> Result<()> {
+pub fn handler(ctx: Context<CreateAmm>, id: Pubkey, fee: u16) -> Result<()> {
     let amm = &mut ctx.accounts.amm;
     amm.id = id;
     amm.admin = ctx.accounts.admin.key();

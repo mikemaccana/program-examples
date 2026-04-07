@@ -28,6 +28,10 @@ pub struct InitWallet<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<InitWallet>, args: InitWalletArgs) -> Result<()> {
+    ctx.accounts.init_wallet(args)
+}
+
 impl InitWallet<'_> {
     pub fn init_wallet(&mut self, args: InitWalletArgs) -> Result<()> {
         let ab_wallet = &mut self.ab_wallet;

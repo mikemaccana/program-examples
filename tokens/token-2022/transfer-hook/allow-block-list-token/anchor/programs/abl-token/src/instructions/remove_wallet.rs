@@ -23,6 +23,10 @@ pub struct RemoveWallet<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<RemoveWallet>) -> Result<()> {
+    ctx.accounts.remove_wallet()
+}
+
 impl RemoveWallet<'_> {
     pub fn remove_wallet(&mut self) -> Result<()> {
         Ok(())

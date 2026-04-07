@@ -37,6 +37,10 @@ pub struct ChangeModeArgs {
     pub threshold: u64,
 }
 
+pub fn handler(ctx: Context<ChangeMode>, args: ChangeModeArgs) -> Result<()> {
+    ctx.accounts.change_mode(args)
+}
+
 impl ChangeMode<'_> {
     pub fn change_mode(&mut self, args: ChangeModeArgs) -> Result<()> {
         let cpi_accounts = TokenMetadataUpdateField {

@@ -50,6 +50,10 @@ pub struct InitMint<'info> {
     pub token_program: Program<'info, Token2022>,
 }
 
+pub fn handler(ctx: Context<InitMint>, args: InitMintArgs) -> Result<()> {
+    ctx.accounts.init_mint(args)
+}
+
 impl InitMint<'_> {
     pub fn init_mint(&mut self, args: InitMintArgs) -> Result<()> {
         let cpi_accounts = TokenMetadataInitialize {

@@ -74,6 +74,11 @@ pub struct TakeOffer<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(context: Context<TakeOffer>) -> Result<()> {
+    send_wanted_tokens_to_maker(&context)?;
+    withdraw_and_close_vault(context)
+}
+
 pub fn send_wanted_tokens_to_maker(ctx: &Context<TakeOffer>) -> Result<()> {
     transfer_tokens(
         &ctx.accounts.taker_token_account_b,

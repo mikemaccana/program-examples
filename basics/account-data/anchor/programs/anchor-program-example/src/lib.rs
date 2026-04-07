@@ -18,6 +18,6 @@ pub mod account_data_anchor_program {
         street: String,
         city: String,
     ) -> Result<()> {
-        create::create_address_info(ctx, name, house_number, street, city)
+        create::handler(ctx, name, house_number, street, city)
     }
 }

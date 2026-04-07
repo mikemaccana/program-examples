@@ -29,6 +29,10 @@ pub struct InitializeExtraAccountMetas<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<InitializeExtraAccountMetas>) -> Result<()> {
+    ctx.accounts.initialize_extra_account_metas_list(ctx.bumps)
+}
+
 impl<'info> InitializeExtraAccountMetas<'info> {
     pub fn initialize_extra_account_metas_list(
         &self,

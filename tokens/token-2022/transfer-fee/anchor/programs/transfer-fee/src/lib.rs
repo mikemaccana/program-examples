@@ -14,19 +14,19 @@ pub mod transfer_fee {
         transfer_fee_basis_points: u16,
         maximum_fee: u64,
     ) -> Result<()> {
-        process_initialize(ctx, transfer_fee_basis_points, maximum_fee)
+        initialize::handler(ctx, transfer_fee_basis_points, maximum_fee)
     }
 
     pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
-        process_transfer(ctx, amount)
+        transfer::handler(ctx, amount)
     }
 
     pub fn harvest<'info>(ctx: Context<'info, Harvest<'info>>) -> Result<()> {
-        process_harvest(ctx)
+        harvest::handler(ctx)
     }
 
     pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
-        process_withdraw(ctx)
+        withdraw::handler(ctx)
     }
 
     pub fn update_fee(
@@ -34,6 +34,6 @@ pub mod transfer_fee {
         transfer_fee_basis_points: u16,
         maximum_fee: u64,
     ) -> Result<()> {
-        process_update_fee(ctx, transfer_fee_basis_points, maximum_fee)
+        update_fee::handler(ctx, transfer_fee_basis_points, maximum_fee)
     }
 }

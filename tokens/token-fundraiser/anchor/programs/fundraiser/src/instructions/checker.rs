@@ -45,6 +45,11 @@ pub struct CheckContributions<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+pub fn handler(ctx: Context<CheckContributions>) -> Result<()> {
+    ctx.accounts.check_contributions()?;
+    Ok(())
+}
+
 impl<'info> CheckContributions<'info> {
     pub fn check_contributions(&self) -> Result<()> {
         

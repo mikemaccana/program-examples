@@ -53,6 +53,11 @@ pub struct Contribute<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<Contribute>, amount: u64) -> Result<()> {
+    ctx.accounts.contribute(amount)?;
+    Ok(())
+}
+
 impl<'info> Contribute<'info> {
     pub fn contribute(&mut self, amount: u64) -> Result<()> {
 

@@ -34,7 +34,7 @@ pub struct MintToken<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn mint_token(ctx: Context<MintToken>, amount: u64) -> Result<()> {
+pub fn handler(ctx: Context<MintToken>, amount: u64) -> Result<()> {
     msg!("Minting token to associated token account...");
     msg!("Mint: {}", &ctx.accounts.mint_account.key());
     msg!(

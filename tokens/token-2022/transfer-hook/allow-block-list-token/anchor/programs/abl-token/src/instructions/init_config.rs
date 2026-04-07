@@ -18,6 +18,10 @@ pub struct InitConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<InitConfig>) -> Result<()> {
+    ctx.accounts.init_config(ctx.bumps.config)
+}
+
 impl InitConfig<'_> {
     pub fn init_config(&mut self, config_bump: u8) -> Result<()> {
         self.config.set_inner(Config {

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::game;
+use crate::CarnivalContext;
 
 // Instruction Data
 
@@ -8,6 +9,19 @@ pub struct PlayGameInstructionData {
     pub gamer_name: String,
     pub gamer_ticket_count: u32,
     pub game: String,
+}
+
+pub fn handler(
+    _ctx: Context<CarnivalContext>,
+    name: String,
+    ticket_count: u32,
+    game_name: String,
+) -> Result<()> {
+    play_game(PlayGameInstructionData {
+        gamer_name: name,
+        gamer_ticket_count: ticket_count,
+        game: game_name,
+    })
 }
 
 pub fn play_game(ix: PlayGameInstructionData) -> Result<()> {

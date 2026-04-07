@@ -6,7 +6,7 @@ use anchor_spl::token_interface::{Token2022};
 use session_keys::{Session, SessionToken};
 use solana_program::program::invoke_signed;
 
-pub fn chop_tree(ctx: Context<ChopTree>, counter: u16, amount: u64) -> Result<()> {
+pub fn handler(ctx: Context<ChopTree>, counter: u16, amount: u64) -> Result<()> {
     let account: &mut ChopTree<'_> = ctx.accounts;
     account.player.update_energy()?;
     account.player.print()?;

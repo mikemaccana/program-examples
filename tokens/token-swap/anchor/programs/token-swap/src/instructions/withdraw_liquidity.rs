@@ -10,7 +10,7 @@ use crate::{
     state::{Amm, Pool},
 };
 
-pub fn withdraw_liquidity(ctx: Context<WithdrawLiquidity>, amount: u64) -> Result<()> {
+pub fn handler(ctx: Context<WithdrawLiquidity>, amount: u64) -> Result<()> {
     let authority_bump = ctx.bumps.pool_authority;
     let authority_seeds = &[
         &ctx.accounts.pool.amm.to_bytes(),

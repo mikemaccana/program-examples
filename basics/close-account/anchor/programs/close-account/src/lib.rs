@@ -10,10 +10,10 @@ pub mod close_account_program {
     use super::*;
 
     pub fn create_user(ctx: Context<CreateUserContext>, name: String) -> Result<()> {
-        create_user::create_user(ctx, name)
+        create_user::handler(ctx, name)
     }
 
     pub fn close_user(ctx: Context<CloseUserContext>) -> Result<()> {
-        close_user::close_user(ctx)
+        close_user::handler(ctx)
     }
 }

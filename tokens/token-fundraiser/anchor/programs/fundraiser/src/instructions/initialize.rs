@@ -37,6 +37,11 @@ pub struct Initialize<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+pub fn handler(ctx: Context<Initialize>, amount: u64, duration: u16) -> Result<()> {
+    ctx.accounts.initialize(amount, duration, &ctx.bumps)?;
+    Ok(())
+}
+
 impl<'info> Initialize<'info> {
     pub fn initialize(&mut self, amount: u64, duration: u16, bumps: &InitializeBumps) -> Result<()> {
 

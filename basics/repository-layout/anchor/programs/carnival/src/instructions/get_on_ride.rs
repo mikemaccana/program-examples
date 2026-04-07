@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::ride;
+use crate::CarnivalContext;
 
 // Instruction Data
 
@@ -9,6 +10,21 @@ pub struct GetOnRideInstructionData {
     pub rider_height: u32,
     pub rider_ticket_count: u32,
     pub ride: String,
+}
+
+pub fn handler(
+    _ctx: Context<CarnivalContext>,
+    name: String,
+    height: u32,
+    ticket_count: u32,
+    ride_name: String,
+) -> Result<()> {
+    get_on_ride(GetOnRideInstructionData {
+        rider_name: name,
+        rider_height: height,
+        rider_ticket_count: ticket_count,
+        ride: ride_name,
+    })
 }
 
 pub fn get_on_ride(ix: GetOnRideInstructionData) -> Result<()> {

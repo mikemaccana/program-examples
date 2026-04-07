@@ -46,6 +46,11 @@ pub struct TransferHook<'info> {
     pub wallet_switch: Account<'info, TransferSwitch>,
 }
 
+pub fn handler(ctx: Context<TransferHook>, _amount: u64) -> Result<()> {
+    ctx.accounts.assert_is_transferring()?;
+    ctx.accounts.assert_switch_is_on()
+}
+
 impl<'info> TransferHook<'info> {
     pub fn assert_switch_is_on(&mut self) -> Result<()> {
         if !self.wallet_switch.on {

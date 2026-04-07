@@ -35,6 +35,10 @@ pub struct AttachToMint<'info> {
     pub token_program: Program<'info, Token2022>,
 }
 
+pub fn handler(ctx: Context<AttachToMint>) -> Result<()> {
+    ctx.accounts.attach_to_mint()
+}
+
 impl AttachToMint<'_> {
     pub fn attach_to_mint(&mut self) -> Result<()> {
         let tx_hook_accs = TransferHookUpdate {

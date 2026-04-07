@@ -15,7 +15,7 @@ pub struct CreateAddressInfo<'info> {
     system_program: Program<'info, System>,
 }
 
-pub fn create_address_info(
+pub fn handler(
     ctx: Context<CreateAddressInfo>,
     name: String,
     house_number: u8,

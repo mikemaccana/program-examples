@@ -53,6 +53,16 @@ pub struct MakeOffer<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(
+    context: Context<MakeOffer>,
+    id: u64,
+    token_a_offered_amount: u64,
+    token_b_wanted_amount: u64,
+) -> Result<()> {
+    send_offered_tokens_to_vault(&context, token_a_offered_amount)?;
+    save_offer(context, id, token_b_wanted_amount)
+}
+
 // Move the tokens from the maker's ATA to the vault
 pub fn send_offered_tokens_to_vault(
     context: &Context<MakeOffer>,

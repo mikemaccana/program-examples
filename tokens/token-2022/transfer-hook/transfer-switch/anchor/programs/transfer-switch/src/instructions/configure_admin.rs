@@ -22,6 +22,11 @@ pub struct ConfigureAdmin<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub fn handler(ctx: Context<ConfigureAdmin>) -> Result<()> {
+    ctx.accounts.is_admin()?;
+    ctx.accounts.configure_admin()
+}
+
 impl<'info> ConfigureAdmin<'info> {
     pub fn is_admin(&self) -> Result<()> {
         // check if we are not creating the account for the first time,

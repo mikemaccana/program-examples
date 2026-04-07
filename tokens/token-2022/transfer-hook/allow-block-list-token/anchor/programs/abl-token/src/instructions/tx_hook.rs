@@ -27,6 +27,10 @@ pub struct TxHook<'info> {
     pub ab_wallet: UncheckedAccount<'info>,
 }
 
+pub fn handler(ctx: Context<TxHook>, amount: u64) -> Result<()> {
+    ctx.accounts.tx_hook(amount)
+}
+
 impl TxHook<'_> {
     pub fn tx_hook(&self, amount: u64) -> Result<()> {
         let mint_info = self.mint.to_account_info();

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::food;
+use crate::CarnivalContext;
 
 // Instruction Data
 
@@ -8,6 +9,19 @@ pub struct EatFoodInstructionData {
     pub eater_name: String,
     pub eater_ticket_count: u32,
     pub food_stand: String,
+}
+
+pub fn handler(
+    _ctx: Context<CarnivalContext>,
+    name: String,
+    ticket_count: u32,
+    food_stand_name: String,
+) -> Result<()> {
+    eat_food(EatFoodInstructionData {
+        eater_name: name,
+        eater_ticket_count: ticket_count,
+        food_stand: food_stand_name,
+    })
 }
 
 pub fn eat_food(ix: EatFoodInstructionData) -> Result<()> {

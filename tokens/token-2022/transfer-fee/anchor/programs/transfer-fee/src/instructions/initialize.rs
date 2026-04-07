@@ -32,7 +32,7 @@ pub struct Initialize<'info> {
 
 // There is currently not an anchor constraint to automatically initialize the TransferFeeConfig extension
 // We can manually create and initialize the mint account via CPIs in the instruction handler
-pub fn process_initialize(
+pub fn handler(
     ctx: Context<Initialize>,
     transfer_fee_basis_points: u16,
     maximum_fee: u64,

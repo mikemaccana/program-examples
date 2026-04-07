@@ -18,7 +18,7 @@ pub struct UpdateAuthority<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn process_update_authority(ctx: Context<UpdateAuthority>) -> Result<()> {
+pub fn handler(ctx: Context<UpdateAuthority>) -> Result<()> {
     let new_authority_key = match &ctx.accounts.new_authority {
         Some(account) => OptionalNonZeroPubkey::try_from(Some(account.key()))?,
         None => OptionalNonZeroPubkey::try_from(None)?,

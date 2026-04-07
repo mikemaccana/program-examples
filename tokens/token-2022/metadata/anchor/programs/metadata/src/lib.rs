@@ -10,22 +10,22 @@ pub mod metadata {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, args: TokenMetadataArgs) -> Result<()> {
-        process_initialize(ctx, args)
+        initialize::handler(ctx, args)
     }
 
     pub fn update_field(ctx: Context<UpdateField>, args: UpdateFieldArgs) -> Result<()> {
-        process_update_field(ctx, args)
+        update_field::handler(ctx, args)
     }
 
     pub fn remove_key(ctx: Context<RemoveKey>, key: String) -> Result<()> {
-        process_remove_key(ctx, key)
+        remove_key::handler(ctx, key)
     }
 
     pub fn emit(ctx: Context<Emit>) -> Result<()> {
-        process_emit(ctx)
+        emit::handler(ctx)
     }
 
     pub fn update_authority(ctx: Context<UpdateAuthority>) -> Result<()> {
-        process_update_authority(ctx)
+        update_authority::handler(ctx)
     }
 }

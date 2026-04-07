@@ -12,10 +12,10 @@ pub mod program_derived_addresses_program {
     use super::*;
 
     pub fn create_page_visits(ctx: Context<CreatePageVisits>) -> Result<()> {
-        create::create_page_visits(ctx)
+        create::handler(ctx)
     }
 
     pub fn increment_page_visits(ctx: Context<IncrementPageVisits>) -> Result<()> {
-        increment::increment_page_visits(ctx)
+        increment::handler(ctx)
     }
 }

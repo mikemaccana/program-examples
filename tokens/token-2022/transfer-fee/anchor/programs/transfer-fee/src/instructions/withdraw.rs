@@ -17,7 +17,7 @@ pub struct Withdraw<'info> {
 
 // transfer fees "harvested" to the mint account can then be withdraw by the withdraw authority
 // this transfers fees on the mint account to the specified token account
-pub fn process_withdraw(ctx: Context<Withdraw>) -> Result<()> {
+pub fn handler(ctx: Context<Withdraw>) -> Result<()> {
     withdraw_withheld_tokens_from_mint(CpiContext::new(
         ctx.accounts.token_program.key(),
         WithdrawWithheldTokensFromMint {

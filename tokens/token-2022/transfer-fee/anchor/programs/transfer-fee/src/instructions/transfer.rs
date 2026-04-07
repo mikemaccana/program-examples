@@ -43,7 +43,7 @@ pub struct Transfer<'info> {
 // transfer fees are automatically deducted from the transfer amount
 // recipients receives (transfer amount - fees)
 // transfer fees are stored directly on the recipient token account and must be "harvested"
-pub fn process_transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
+pub fn handler(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     // read mint account extension data
     let mint = &ctx.accounts.mint_account.to_account_info();
     let mint_data = mint.data.borrow();

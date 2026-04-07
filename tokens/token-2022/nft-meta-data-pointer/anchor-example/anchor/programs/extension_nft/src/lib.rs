@@ -14,7 +14,7 @@ pub mod extension_nft {
     use super::*;
 
     pub fn init_player(ctx: Context<InitPlayer>, _level_seed: String) -> Result<()> {
-        init_player::init_player(ctx)
+        init_player::handler(ctx)
     }
 
     // This function lets the player chop a tree and get 1 wood. The session_auth_or macro
@@ -26,10 +26,10 @@ pub mod extension_nft {
         GameErrorCode::WrongAuthority
     )]
     pub fn chop_tree(ctx: Context<ChopTree>, _level_seed: String, counter: u16) -> Result<()> {
-        chop_tree::chop_tree(ctx, counter, 1)
+        chop_tree::handler(ctx, counter, 1)
     }
 
     pub fn mint_nft(ctx: Context<MintNft>) -> Result<()> {
-        mint_nft::mint_nft(ctx)
+        mint_nft::handler(ctx)
     }
 }

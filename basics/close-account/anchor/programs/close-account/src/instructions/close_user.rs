@@ -18,6 +18,6 @@ pub struct CloseUserContext<'info> {
     pub user_account: Account<'info, UserState>,
 }
 
-pub fn close_user(_ctx: Context<CloseUserContext>) -> Result<()> {
+pub fn handler(_ctx: Context<CloseUserContext>) -> Result<()> {
     Ok(())
 }

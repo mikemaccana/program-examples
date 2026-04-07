@@ -11,7 +11,7 @@ use crate::{
     state::{Amm, Pool},
 };
 
-pub fn swap_exact_tokens_for_tokens(
+pub fn handler(
     ctx: Context<SwapExactTokensForTokens>,
     swap_a: bool,
     input_amount: u64,

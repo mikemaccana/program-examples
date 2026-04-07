@@ -33,7 +33,7 @@ pub struct TransferTokens<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
+pub fn handler(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
     msg!("Transferring tokens...");
     msg!(
         "Mint: {}",
