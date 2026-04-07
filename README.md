@@ -30,10 +30,7 @@ Each folder includes examples for one or more of the following:
 
 **If a given example is missing, please send us a PR to add it!** Our aim is to have every example available in every option. We'd also love to see more programs involving staking, wrapped tokens, oracles, compression and VRF. Follow the [contributing guidelines](./CONTRIBUTING.md) to keep things consistent.
 
-## The example programs
-
-<details>
-  <summary>Basics</summary>
+## Basics
 
 ### Hello world
 
@@ -125,9 +122,7 @@ How to store state that changes size in Solana.
 
 [anchor](./basics/transfer-sol/anchor) [native](./basics/transfer-sol/native) [pinocchio](./basics/transfer-sol/pinocchio)
 
-</details>
-<details>
-  <summary>Tokens</summary>
+## Tokens
 
 ### Creating tokens
 
@@ -171,11 +166,7 @@ Allow two users to swap digital assets with each other, each getting 100% of wha
 
 [anchor](./tokens/token-swap/anchor)
 
-</details>
-
-<details>
-
-  <summary>Token Extensions</summary>
+## Token Extensions
 
 ### Basics - create token mints, mint tokens, and transfer tokens with Token Extensions
 
@@ -255,10 +246,7 @@ Create tokens with an inbuilt transfer fee.
 
 [anchor](./tokens/token-2022/transfer-fee/anchor) [native](./tokens/token-2022/transfer-fee/native)
 
-</details>
-<details>
-
-<summary>Compression</summary>
+## Compression
 
 ### Cnft-burn
 
@@ -278,18 +266,10 @@ Work with Metaplex compressed NFTs.
 
 [anchor](./compression/cutils/anchor)
 
-</details>
-
-<details>
-
-<summary>Oracles</summary>
+## Oracles
 
 ### pyth
 
 Use a data source for offchain data (called an Oracle) to perform activities onchain.
 
 [anchor](./oracles/pyth/anchor)
-
-</details>
-
----
