@@ -6,12 +6,12 @@ declare_id!("E64FVeubGC4NPNF2UBJYX4AkrVowf74fRJD9q6YhwstN");
 pub mod lever {
     use super::*;
 
-    pub fn initialize(_ctx: Context<InitializeLever>) -> Result<()> {
+    pub fn initialize(_context: Context<InitializeLever>) -> Result<()> {
         Ok(())
     }
 
-    pub fn switch_power(ctx: Context<SetPowerStatus>, name: String) -> Result<()> {
-        let power = &mut ctx.accounts.power;
+    pub fn switch_power(context: Context<SetPowerStatus>, name: String) -> Result<()> {
+        let power = &mut context.accounts.power;
         power.is_on = !power.is_on;
 
         msg!("{} is pulling the power switch!", &name);
