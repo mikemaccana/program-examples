@@ -164,6 +164,12 @@ Transfer tokens between accounts.
 
 [⚓ Anchor](./tokens/transfer-tokens/anchor) [💫 Quasar](./tokens/transfer-tokens/quasar) [🦀 Native](./tokens/transfer-tokens/native)
 
+### Central Limit Order Book
+
+Order-book exchange — users post limit bids and asks at chosen prices, tokens are locked in program vaults, and orders can be cancelled and funds settled back. A minimal teaching example of the mechanics behind Openbook and Phoenix.
+
+[⚓ Anchor](./defi/clob/anchor)
+
 ### PDA Mint Authority
 
 Mint tokens using a PDA as the mint authority, so your program controls token issuance.
