@@ -11,6 +11,9 @@ pub struct Amm {
 
     /// The LP fee taken on each trade, in basis points
     pub fee: u16,
+
+    /// Canonical bump for this PDA.
+    pub bump: u8,
 }
 
 #[account]
@@ -24,4 +27,7 @@ pub struct Pool {
 
     /// Mint of token B
     pub mint_b: Pubkey,
+
+    /// Canonical bump for this PDA.
+    pub bump: u8,
 }

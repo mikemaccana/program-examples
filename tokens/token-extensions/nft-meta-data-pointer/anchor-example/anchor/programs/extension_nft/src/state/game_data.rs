@@ -6,6 +6,8 @@ use crate::constants::MAX_WOOD_PER_TREE;
 #[derive(InitSpace)]
 pub struct GameData {
     pub total_wood_collected: u64,
+    /// Canonical bump for this PDA.
+    pub bump: u8,
 }
 
 impl GameData {

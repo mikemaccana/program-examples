@@ -16,8 +16,9 @@ pub mod transfer_switch {
     use super::*;
 
     pub fn configure_admin(mut context: Context<ConfigureAdmin>) -> Result<()> {
+        let bump = context.bumps.admin_config;
         handle_is_admin(&mut context.accounts)?;
-        handle_configure_admin(&mut context.accounts)
+        handle_configure_admin(&mut context.accounts, bump)
     }
 
     #[instruction(discriminator = InitializeExtraAccountMetaListInstruction::SPL_DISCRIMINATOR_SLICE)]
@@ -28,7 +29,8 @@ pub mod transfer_switch {
     }
 
     pub fn switch(mut context: Context<Switch>, on: bool) -> Result<()> {
-        handle_switch(&mut context.accounts, on)
+        let bump = context.bumps.wallet_switch;
+        handle_switch(&mut context.accounts, on, bump)
     }
 
     #[instruction(discriminator = ExecuteInstruction::SPL_DISCRIMINATOR_SLICE)]

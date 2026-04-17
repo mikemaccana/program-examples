@@ -10,10 +10,12 @@ use crate::{
 };
 
 pub fn handle_create_pool(mut context: Context<CreatePool>) -> Result<()> {
+    let bump = context.bumps.pool;
     let pool = &mut context.accounts.pool;
     pool.amm = context.accounts.amm.key();
     pool.mint_a = context.accounts.mint_a.key();
     pool.mint_b = context.accounts.mint_b.key();
+    pool.bump = bump;
 
     Ok(())
 }

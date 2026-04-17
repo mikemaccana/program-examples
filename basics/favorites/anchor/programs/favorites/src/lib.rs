@@ -25,6 +25,7 @@ pub mod favorites {
             number,
             color,
             hobbies,
+            bump: context.bumps.favorites,
         });
         Ok(())
     }
@@ -43,6 +44,10 @@ pub struct Favorites {
 
     #[max_len(5, 50)]
     pub hobbies: Vec<String>,
+
+    /// Canonical bump for this PDA. Stored so later instructions can
+    /// re-derive/validate the PDA without recomputing via `find_program_address`.
+    pub bump: u8,
 }
 // When people call the set_favorites instruction, they will need to provide the accounts that will be modifed. This keeps Solana fast!
 #[derive(Accounts)]

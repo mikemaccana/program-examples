@@ -38,10 +38,11 @@ pub fn handle_is_admin(accounts: &mut ConfigureAdmin) -> Result<()> {
         Ok(())
     }
 
-pub fn handle_configure_admin(accounts: &mut ConfigureAdmin) -> Result<()> {
+pub fn handle_configure_admin(accounts: &mut ConfigureAdmin, bump: u8) -> Result<()> {
         accounts.admin_config.set_inner(AdminConfig {
             admin: accounts.new_admin.key(), // set the admin pubkey that can switch transfers on/off
             is_initialised: true,        // let us know an admin has been set
+            bump,                        // canonical bump for the admin-config PDA
         });
         Ok(())
     }

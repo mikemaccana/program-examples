@@ -52,7 +52,7 @@ pub struct Contribute<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_contribute(accounts: &mut Contribute, amount: u64) -> Result<()> {
+pub fn handle_contribute(accounts: &mut Contribute, amount: u64, bumps: &ContributeBumps) -> Result<()> {
 
         // Check if the amount to contribute meets the minimum amount required
         require!(
@@ -101,6 +101,12 @@ pub fn handle_contribute(accounts: &mut Contribute, amount: u64) -> Result<()> {
         accounts.fundraiser.current_amount += amount;
 
         accounts.contributor_account.amount += amount;
+
+        // Save the contributor PDA bump on first init (init_if_needed only
+        // runs the init branch once; stored bump is zero until set).
+        if accounts.contributor_account.bump == 0 {
+            accounts.contributor_account.bump = bumps.contributor_account;
+        }
 
         Ok(())
     }

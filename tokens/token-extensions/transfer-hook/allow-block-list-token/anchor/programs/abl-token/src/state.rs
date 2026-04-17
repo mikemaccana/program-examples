@@ -10,6 +10,8 @@ use anchor_lang::prelude::*;
 pub struct ABWallet {
     pub wallet: Pubkey,
     pub allowed: bool,
+    /// Canonical bump for this PDA.
+    pub bump: u8,
 }
 
 #[account]

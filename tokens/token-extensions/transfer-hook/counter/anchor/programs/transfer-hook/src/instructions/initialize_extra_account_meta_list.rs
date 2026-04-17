@@ -45,5 +45,7 @@ pub fn handler(mut context: Context<InitializeExtraAccountMetaList>) -> Result<(
         &extra_account_metas,
     ).map_err(|_| ProgramError::InvalidAccountData)?;
 
+    context.accounts.counter_account.bump = context.bumps.counter_account;
+
     Ok(())
 }

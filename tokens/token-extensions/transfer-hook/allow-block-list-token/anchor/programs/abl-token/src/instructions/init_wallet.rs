@@ -29,10 +29,11 @@ pub struct InitWallet<'info> {
 }
 
 impl InitWallet<'_> {
-    pub fn init_wallet(&mut self, args: InitWalletArgs) -> Result<()> {
+    pub fn init_wallet(&mut self, args: InitWalletArgs, bump: u8) -> Result<()> {
         let ab_wallet = &mut self.ab_wallet;
         ab_wallet.wallet = self.wallet.key();
         ab_wallet.allowed = args.allowed;
+        ab_wallet.bump = bump;
         Ok(())
     }
 }

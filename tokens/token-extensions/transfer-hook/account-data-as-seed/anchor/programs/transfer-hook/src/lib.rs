@@ -90,4 +90,6 @@ pub fn handle_extra_account_metas_count() -> usize {
 #[derive(InitSpace)]
 pub struct CounterAccount {
     pub counter: u64,
+    /// Canonical bump for this PDA.
+    pub bump: u8,
 }

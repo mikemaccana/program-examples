@@ -22,7 +22,7 @@ pub mod fundraiser {
     }
 
     pub fn contribute(mut context: Context<Contribute>, amount: u64) -> Result<()> {
-        handle_contribute(&mut context.accounts, amount)?;
+        handle_contribute(&mut context.accounts, amount, &context.bumps)?;
 
         Ok(())
     }

@@ -31,6 +31,7 @@ pub struct InitializeExtraAccountMetaList<'info> {
 pub fn handler(mut context: Context<InitializeExtraAccountMetaList>) -> Result<()> {
     // set authority field on white_list account as payer address
     context.accounts.white_list.authority = context.accounts.payer.key();
+    context.accounts.white_list.bump = context.bumps.white_list;
 
     let extra_account_metas = handle_extra_account_metas()?;
 

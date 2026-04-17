@@ -3,10 +3,12 @@ use anchor_lang::prelude::*;
 use crate::{errors::*, state::Amm};
 
 pub fn handle_create_amm(mut context: Context<CreateAmm>, id: Pubkey, fee: u16) -> Result<()> {
+    let bump = context.bumps.amm;
     let amm = &mut context.accounts.amm;
     amm.id = id;
     amm.admin = context.accounts.admin.key();
     amm.fee = fee;
+    amm.bump = bump;
 
     Ok(())
 }

@@ -87,4 +87,6 @@ pub struct WhiteList {
     pub authority: Pubkey,
     #[max_len(11)]
     pub white_list: Vec<Pubkey>,
+    /// Canonical bump for this PDA.
+    pub bump: u8,
 }

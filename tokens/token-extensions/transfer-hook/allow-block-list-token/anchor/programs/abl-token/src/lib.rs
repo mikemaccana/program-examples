@@ -38,7 +38,8 @@ pub mod abl_token {
     }
 
     pub fn init_wallet(context: Context<InitWallet>, args: InitWalletArgs) -> Result<()> {
-        context.accounts.init_wallet(args)
+        let bump = context.bumps.ab_wallet;
+        context.accounts.init_wallet(args, bump)
     }
 
     pub fn remove_wallet(context: Context<RemoveWallet>) -> Result<()> {

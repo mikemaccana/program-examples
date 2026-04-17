@@ -7,6 +7,9 @@ use session_keys::{Session, SessionToken};
 use solana_program::program::invoke_signed;
 
 pub fn chop_tree(context: Context<ChopTree>, counter: u16, amount: u64) -> Result<()> {
+    // Save game_data bump on first creation (init_if_needed). See init_player.rs
+    // for the same pattern.
+    let game_data_bump = context.bumps.game_data;
     let account: &mut ChopTree<'_> = context.accounts;
     account.player.update_energy()?;
     account.player.print()?;
@@ -18,6 +21,9 @@ pub fn chop_tree(context: Context<ChopTree>, counter: u16, amount: u64) -> Resul
     account.player.last_id = counter;
     account.player.chop_tree(amount)?;
     account.game_data.on_tree_chopped(amount)?;
+    if account.game_data.bump == 0 {
+        account.game_data.bump = game_data_bump;
+    }
 
     msg!(
         "You chopped a tree and got 1 wood. You have {} wood and {} energy left.",
