@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 
+mod instructions;
+use instructions::*;
+
 declare_id!("Fod47xKXjdHVQDzkFPBvfdWLm8gEAV4iMSXkfUzCHiSD");
 
 #[program]
@@ -7,45 +10,12 @@ pub mod anchor_realloc {
     use super::*;
 
     pub fn initialize(context: Context<Initialize>, input: String) -> Result<()> {
-        context.accounts.message_account.message = input;
-        Ok(())
+        instructions::initialize::handler(context, input)
     }
 
     pub fn update(context: Context<Update>, input: String) -> Result<()> {
-        context.accounts.message_account.message = input;
-        Ok(())
+        instructions::update::handler(context, input)
     }
-}
-
-#[derive(Accounts)]
-#[instruction(input: String)]
-pub struct Initialize<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    #[account(
-        init,
-        payer = payer,
-        space = Message::required_space(input.len()),
-    )]
-    pub message_account: Account<'info, Message>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(input: String)]
-pub struct Update<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    #[account(
-        mut,
-        realloc = Message::required_space(input.len()),
-        realloc::payer = payer,
-        realloc::zero = true,
-    )]
-    pub message_account: Account<'info, Message>,
-    pub system_program: Program<'info, System>,
 }
 
 #[account]
