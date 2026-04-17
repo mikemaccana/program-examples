@@ -2,7 +2,7 @@
 
 This example contains **two separate Quasar programs** that work together:
 
-- **`lever/`** — A program with on-chain `PowerStatus` state and a `switch_power` instruction that toggles a boolean.
+- **`lever/`** — A program with onchain `PowerStatus` state and a `switch_power` instruction that toggles a boolean.
 - **`hand/`** — A program that calls the lever program's `switch_power` via CPI.
 
 ## Building

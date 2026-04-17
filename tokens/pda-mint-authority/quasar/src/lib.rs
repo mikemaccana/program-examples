@@ -14,7 +14,7 @@ declare_id!("22222222222222222222222222222222222222222222");
 /// The same PDA serves as both the mint address AND the mint authority,
 /// so minting requires PDA signing.
 ///
-/// The Anchor version uses Metaplex for on-chain metadata. Quasar does not have
+/// The Anchor version uses Metaplex for onchain metadata. Quasar does not have
 /// a Metaplex integration crate, so this example focuses on the PDA-as-authority
 /// pattern.
 #[program]

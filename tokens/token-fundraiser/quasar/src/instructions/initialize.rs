@@ -32,7 +32,7 @@ pub fn handle_initialize(
         *accounts.mint_to_raise.address(),
         amount_to_raise,
         0,  // current_amount starts at 0
-        0,  // time_started — would be Clock::get() on-chain
+        0,  // time_started — would be Clock::get() onchain
         duration,
         bump,
     );

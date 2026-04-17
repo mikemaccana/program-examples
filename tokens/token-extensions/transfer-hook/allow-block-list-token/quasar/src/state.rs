@@ -1,10 +1,10 @@
 use quasar_lang::prelude::Address;
 
-/// On-chain layout for ABWallet: [32 bytes wallet] [1 byte allowed]
+/// Onchain layout for ABWallet: [32 bytes wallet] [1 byte allowed]
 /// Total = 33 bytes.
 pub const AB_WALLET_SIZE: u64 = 33;
 
-/// On-chain layout for Config: [32 bytes authority] [1 byte bump]
+/// Onchain layout for Config: [32 bytes authority] [1 byte bump]
 /// Total = 33 bytes.
 pub const CONFIG_SIZE: u64 = 33;
 

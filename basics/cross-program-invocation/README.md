@@ -14,7 +14,7 @@ Consider the below sequence of operations of an example **token mint** program:
 
 In the above steps, we can't create a metadata account without first creating a mint! In fact, we have to do all of these operations in order.   
 
-Let's say we decided it was essential to have our mint (operation 1) and our "mint to user" (operation 4) tasks on-chain. We would have no choice but to also include the other two operations, since we can't do operation #1, pause the program while we do #2 & #3 from the client, and then resume the program for #4.
+Let's say we decided it was essential to have our mint (operation 1) and our "mint to user" (operation 4) tasks onchain. We would have no choice but to also include the other two operations, since we can't do operation #1, pause the program while we do #2 & #3 from the client, and then resume the program for #4.
 
 #### Notes on Native setup:
 

@@ -224,7 +224,7 @@ fn secp256k1_recover(
     }
     #[cfg(not(target_os = "solana"))]
     {
-        // Off-chain: not implemented (would need a secp256k1 library).
+        // Offchain: not implemented (would need a secp256k1 library).
         let _ = (message_hash, recovery_id, signature);
         None
     }

@@ -55,7 +55,7 @@ By implementing these strategies, we are creating a solana program that efficien
 
 ## Principals
 
-Here are some essential principles to consider when building on-chain programs in Solana:
+Here are some essential principles to consider when building onchain programs in Solana:
 
 - Store Keys in the Account: It's beneficial to store keys in the account when creating Program Derived Accounts (PDAs) using seeds. While this may increase account rent slightly, it offers significant advantages. By having all the necessary keys in the account, it becomes effortless to locate the account (since you can recreate its public key). Additionally, this approach works seamlessly with Anchor's has_one clause, streamlining the process.
 
@@ -63,7 +63,7 @@ Here are some essential principles to consider when building on-chain programs i
 
 - Minimize Instruction's Scope: Keeping each instruction's scope as small as possible is crucial for several reasons. It helps reduce transaction size by limiting the number of accounts touched simultaneously. Moreover, it enhances composability, readability, and security. However, a trade-off to consider is that it may lead to an increase in Lines Of Code (LOC).
 
-- By following these principles, you can build on-chain programs in Solana that are efficient, well-organized, and conducive to seamless interactions, ensuring a robust foundation for your blockchain projects.
+- By following these principles, you can build onchain programs in Solana that are efficient, well-organized, and conducive to seamless interactions, ensuring a robust foundation for your blockchain projects.
 
 ## Code Examples
 

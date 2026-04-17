@@ -57,7 +57,7 @@ fn decode_wallet_mode(accounts: &TxHook) -> Result<DecodedWalletMode, ProgramErr
         return Ok(DecodedWalletMode::None);
     }
 
-    // ABWallet on-chain: [32 bytes wallet] [1 byte allowed]
+    // ABWallet onchain: [32 bytes wallet] [1 byte allowed]
     let data = wallet_view.try_borrow()?;
     if data.len() < AB_WALLET_SIZE as usize {
         return Ok(DecodedWalletMode::None);

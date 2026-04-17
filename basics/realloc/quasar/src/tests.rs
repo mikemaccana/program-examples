@@ -129,5 +129,5 @@ fn test_update_longer_message() {
 
     // Note: QuasarSvm may not fully reflect realloc changes (data length change)
     // in test results. The realloc is handled by set_inner which modifies the
-    // RuntimeAccount data_len field directly. On-chain this works correctly.
+    // RuntimeAccount data_len field directly. Onchain this works correctly.
 }

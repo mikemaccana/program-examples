@@ -10,7 +10,7 @@ declare_id!("22222222222222222222222222222222222222222222");
 
 /// Demonstrates creating a mint, minting tokens, and transferring between accounts.
 ///
-/// The Anchor version uses Metaplex for on-chain metadata. Quasar does not have
+/// The Anchor version uses Metaplex for onchain metadata. Quasar does not have
 /// a Metaplex integration crate, so this example focuses on the core SPL Token
 /// operations: minting and transferring.
 #[program]

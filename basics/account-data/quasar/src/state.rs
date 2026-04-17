@@ -1,6 +1,6 @@
 use quasar_lang::prelude::*;
 
-/// On-chain address info account with dynamic string fields.
+/// Onchain address info account with dynamic string fields.
 /// Uses Quasar's `String<P, N>` marker type for variable-length string data.
 /// The lifetime `'a` is required because the generated code produces `&'a str` accessors.
 ///

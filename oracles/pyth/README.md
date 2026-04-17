@@ -1,6 +1,6 @@
 ## What is Pyth ?
 
-Pyth is an Oracle that offers on-chain low-latency market data from institutional sources.
+Pyth is an Oracle that offers onchain low-latency market data from institutional sources.
 This means you can use prices from real-life assets in your Solana programs.
 
 The price for each asset will be represented inside of a Solana account. We call those accounts price feeds.

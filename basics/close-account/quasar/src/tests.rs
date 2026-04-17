@@ -123,7 +123,7 @@ fn test_close_user() {
     // owner, and resize data are applied to the BPF input buffer but aren't read back
     // by the TransactionContext in the test harness.
     //
-    // The close instruction executes successfully on-chain — verified by:
+    // The close instruction executes successfully onchain — verified by:
     // - The instruction succeeds (assert_success above)
     // - Program log shows "close_user: executing close" when logging is enabled
     // - CU consumption is consistent with close operations

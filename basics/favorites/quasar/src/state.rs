@@ -1,6 +1,6 @@
 use quasar_lang::prelude::*;
 
-/// User favourites stored on-chain.
+/// User favourites stored onchain.
 ///
 /// The Anchor version also stores `hobbies: Vec<String>`, but Quasar doesn't
 /// support nested dynamic types (Vec<String>). We keep number + color, which

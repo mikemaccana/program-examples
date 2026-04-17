@@ -2,7 +2,7 @@
 
 This is a simple example of a program that creates a NFT using the new token extension program and facilitating the token extension meta data pointer.
 
-The cool thing about this especially for games is that we can now have additional metadata fields on chain as a key value store which can be used to save the state of the game character. In this example we save the level and the collected wood of the player.
+The cool thing about this especially for games is that we can now have additional metadata fields onchain as a key value store which can be used to save the state of the game character. In this example we save the level and the collected wood of the player.
 
 This opens all kind of interesting possibilities for games. You can for example save the level and xp of the player, the current weapon and armor, the current quest and so on. When market places will eventually support additional meta data the nfts could be filtered and ordered by the meta data fields and NFTs with better values like higher level could potentially gain more value by playing.
 
@@ -221,7 +221,7 @@ npx create-solana-game gamName
 
 # Solana Game Preset
 
-This game is ment as a starter game for on chain games.
+This game is ment as a starter game for onchain games.
 There is a js and a unity client for this game and both are talking to a solana anchor program.
 
 This game uses gum session keys for auto approval of transactions.
@@ -329,7 +329,7 @@ The project uses session keys (maintained by Magic Block) for auto approving tra
 
 # Energy System
 
-Many casual games in traditional gaming use energy systems. This is how you can build it on chain.
+Many casual games in traditional gaming use energy systems. This is how you can build it onchain.
 
 If you have no prior knowledge in solana and rust programming it is recommended to start with the Solana cookbook [Hello world example]([https://unity.com/](https://solanacookbook.com/gaming/hello-world.html#getting-started-with-your-first-solana-game)).
 

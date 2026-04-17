@@ -114,7 +114,7 @@ pub fn get_asset_id(tree: &Address, nonce: u64) -> Address {
 /// Compute the leaf hash for a V1 LeafSchema using keccak256.
 ///
 /// On SBF this calls the sol_keccak256 syscall directly.
-/// Off-chain (tests) this is a no-op returning zeros.
+/// Offchain (tests) this is a no-op returning zeros.
 pub fn leaf_schema_v1_hash(
     id: &Address,
     owner: &Address,
@@ -136,7 +136,7 @@ pub fn leaf_schema_v1_hash(
     keccak256(&input)
 }
 
-/// Keccak256 hash using the SBF syscall on-chain, or a placeholder off-chain.
+/// Keccak256 hash using the SBF syscall onchain, or a placeholder offchain.
 fn keccak256(input: &[u8]) -> [u8; 32] {
     #[cfg(any(target_os = "solana", target_arch = "bpf"))]
     {

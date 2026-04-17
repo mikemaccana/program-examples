@@ -81,7 +81,7 @@ fn test_create_address_info() {
     // Verify the account data.
     let account = result.account(&address_info).unwrap();
 
-    // On-chain layout (from #[account] dynamic codegen):
+    // Onchain layout (from #[account] dynamic codegen):
     //   [disc: 1 byte = 1]
     //   [ZC header: house_number u8]
     //   [name: u8 prefix + bytes]   (String<u8, 50> uses u8 prefix)

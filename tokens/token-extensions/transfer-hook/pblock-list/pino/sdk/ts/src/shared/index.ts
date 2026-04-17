@@ -91,7 +91,7 @@ export type ResolvedAccount<
 };
 
 /**
- * Defines an instruction that stores additional bytes on-chain.
+ * Defines an instruction that stores additional bytes onchain.
  * @internal
  */
 export type IInstructionWithByteDelta = {
