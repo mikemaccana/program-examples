@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
-use anchor_spl::token::{Token, TokenAccount, Transfer};
 use sha3::{Digest, Keccak256};
 use solana_secp256k1_recover::secp256k1_recover;
+
+mod instructions;
+use instructions::*;
 
 declare_id!("FYPkt5VWMvtyWZDMGCwoKFkE3wXTzphicTpnNGuHWVbD");
 
@@ -10,20 +11,15 @@ declare_id!("FYPkt5VWMvtyWZDMGCwoKFkE3wXTzphicTpnNGuHWVbD");
 pub mod external_delegate_token_master {
     use super::*;
 
-    pub fn initialize(mut context: Context<Initialize>) -> Result<()> {
-        let user_account = &mut context.accounts.user_account;
-        user_account.authority = context.accounts.authority.key();
-        user_account.ethereum_address = [0; 20];
-        Ok(())
+    pub fn initialize(context: Context<Initialize>) -> Result<()> {
+        instructions::initialize::handler(context)
     }
 
     pub fn set_ethereum_address(
-        mut context: Context<SetEthereumAddress>,
+        context: Context<SetEthereumAddress>,
         ethereum_address: [u8; 20],
     ) -> Result<()> {
-        let user_account = &mut context.accounts.user_account;
-        user_account.ethereum_address = ethereum_address;
-        Ok(())
+        instructions::set_ethereum_address::handler(context, ethereum_address)
     }
 
     pub fn transfer_tokens(
@@ -32,104 +28,12 @@ pub mod external_delegate_token_master {
         signature: [u8; 65],
         message: [u8; 32],
     ) -> Result<()> {
-        let user_account = &context.accounts.user_account;
-
-        if !verify_ethereum_signature(&user_account.ethereum_address, &message, &signature) {
-            return Err(ErrorCode::InvalidSignature.into());
-        }
-
-        // Transfer tokens
-        let transfer_instruction = Transfer {
-            from: context.accounts.user_token_account.to_account_info(),
-            to: context.accounts.recipient_token_account.to_account_info(),
-            authority: context.accounts.user_pda.to_account_info(),
-        };
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                context.accounts.token_program.key(),
-                transfer_instruction,
-                &[&[user_account.key().as_ref(), &[context.bumps.user_pda]]],
-            ),
-            amount,
-        )?;
-
-        Ok(())
+        instructions::transfer_tokens::handler(context, amount, signature, message)
     }
 
     pub fn authority_transfer(context: Context<AuthorityTransfer>, amount: u64) -> Result<()> {
-        // Transfer tokens
-        let transfer_instruction = Transfer {
-            from: context.accounts.user_token_account.to_account_info(),
-            to: context.accounts.recipient_token_account.to_account_info(),
-            authority: context.accounts.user_pda.to_account_info(),
-        };
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                context.accounts.token_program.key(),
-                transfer_instruction,
-                &[&[
-                    context.accounts.user_account.key().as_ref(),
-                    &[context.bumps.user_pda],
-                ]],
-            ),
-            amount,
-        )?;
-
-        Ok(())
+        instructions::authority_transfer::handler(context, amount)
     }
-}
-
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(init, payer = authority, space = 8 + 32 + 20)]
-    // Ensure this is only for user_account
-    pub user_account: Account<'info, UserAccount>,
-    #[account(mut)]
-    pub authority: Signer<'info>, // This should remain as a signer
-    pub system_program: Program<'info, System>, // Required for initialization
-}
-
-#[derive(Accounts)]
-pub struct SetEthereumAddress<'info> {
-    #[account(mut, has_one = authority)]
-    pub user_account: Account<'info, UserAccount>,
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct TransferTokens<'info> {
-    #[account(has_one = authority)]
-    pub user_account: Account<'info, UserAccount>,
-    pub authority: Signer<'info>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub recipient_token_account: Account<'info, TokenAccount>,
-    #[account(
-        seeds = [user_account.key().as_ref()],
-        bump,
-    )]
-    pub user_pda: SystemAccount<'info>,
-    pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct AuthorityTransfer<'info> {
-    #[account(has_one = authority)]
-    pub user_account: Account<'info, UserAccount>,
-    pub authority: Signer<'info>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub recipient_token_account: Account<'info, TokenAccount>,
-    #[account(
-        seeds = [user_account.key().as_ref()],
-        bump,
-    )]
-    pub user_pda: SystemAccount<'info>,
-    pub token_program: Program<'info, Token>,
 }
 
 #[account]
@@ -144,7 +48,7 @@ pub enum ErrorCode {
     InvalidSignature,
 }
 
-fn verify_ethereum_signature(
+pub fn verify_ethereum_signature(
     ethereum_address: &[u8; 20],
     message: &[u8; 32],
     signature: &[u8; 65],
