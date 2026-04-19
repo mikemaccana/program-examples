@@ -30,4 +30,6 @@ pub enum AssetLeasingError {
     MathOverflow,
     #[msg("Signer is not authorised for this action")]
     Unauthorised,
+    #[msg("Leased mint and collateral mint must be different")]
+    LeasedMintEqualsCollateralMint,
 }

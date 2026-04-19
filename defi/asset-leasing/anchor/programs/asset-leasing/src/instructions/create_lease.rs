@@ -80,6 +80,16 @@ pub fn handle_create_lease(
     maintenance_margin_bps: u16,
     liquidation_bounty_bps: u16,
 ) -> Result<()> {
+    // Reject leased_mint == collateral_mint. Allowing both to be the same SPL
+    // mint would collapse the two vaults' seed derivations into one shared
+    // token-balance pool, making rent-vs-collateral accounting ambiguous and
+    // enabling griefing paths where the lessee's "collateral" is the same
+    // asset they already hold as the lease principal.
+    require!(
+        context.accounts.leased_mint.key() != context.accounts.collateral_mint.key(),
+        AssetLeasingError::LeasedMintEqualsCollateralMint
+    );
+
     require!(leased_amount > 0, AssetLeasingError::InvalidLeasedAmount);
     require!(
         required_collateral_amount > 0,

@@ -878,3 +878,60 @@ fn close_expired_cancels_listed_lease() {
     assert!(sc.svm.get_account(&leased_vault).is_none());
     assert!(sc.svm.get_account(&collateral_vault).is_none());
 }
+
+#[test]
+fn create_lease_rejects_same_mint_for_leased_and_collateral() {
+    // Collapsing leased_mint and collateral_mint into a single SPL mint would
+    // also collapse the two vaults into one token-balance pool (same mint,
+    // same authority seed pattern) and make rent-vs-collateral accounting
+    // ambiguous. The program rejects this up-front with
+    // `LeasedMintEqualsCollateralMint`.
+    let mut sc = full_setup();
+    let lease_id = 42u64;
+
+    // Build a `create_lease` instruction where the collateral_mint field
+    // carries the same mint as leased_mint. We bypass `build_create_lease_ix`
+    // because that helper always wires the two mints from the scenario.
+    let (lease, leased_vault, collateral_vault) =
+        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
+    let ix = Instruction::new_with_bytes(
+        sc.program_id,
+        &asset_leasing::instruction::CreateLease {
+            lease_id,
+            leased_amount: LEASED_AMOUNT,
+            required_collateral_amount: REQUIRED_COLLATERAL,
+            rent_per_second: RENT_PER_SECOND,
+            duration_seconds: DURATION_SECONDS,
+            maintenance_margin_bps: MAINTENANCE_MARGIN_BPS,
+            liquidation_bounty_bps: LIQUIDATION_BOUNTY_BPS,
+        }
+        .data(),
+        asset_leasing::accounts::CreateLease {
+            lessor: sc.lessor.pubkey(),
+            leased_mint: sc.leased_mint,
+            // Same mint on both sides — should be rejected.
+            collateral_mint: sc.leased_mint,
+            lessor_leased_account: sc.lessor_leased_ata,
+            lease,
+            leased_vault,
+            collateral_vault,
+            token_program: token_program_id(),
+            system_program: system_program::id(),
+        }
+        .to_account_metas(None),
+    );
+
+    let result = send_transaction_from_instructions(
+        &mut sc.svm,
+        vec![ix],
+        &[&sc.lessor],
+        &sc.lessor.pubkey(),
+    );
+
+    let err = result.expect_err("create_lease must reject identical leased/collateral mints");
+    let rendered = format!("{err:?}");
+    assert!(
+        rendered.contains("LeasedMintEqualsCollateralMint") || rendered.contains("0x177e"),
+        "unexpected failure mode: {rendered}"
+    );
+}
