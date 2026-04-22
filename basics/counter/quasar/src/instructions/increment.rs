@@ -10,11 +10,9 @@ pub struct Increment {
     pub counter: Account<Counter>,
 }
 
-impl Increment {
-    #[inline(always)]
-    pub fn increment(&mut self) -> Result<(), ProgramError> {
-        let current: u64 = self.counter.count.into();
-        self.counter.count = PodU64::from(current.checked_add(1).unwrap());
-        Ok(())
-    }
+#[inline(always)]
+pub fn handle_increment(accounts: &mut Increment) -> Result<(), ProgramError> {
+    let current: u64 = accounts.counter.count.into();
+    accounts.counter.count = PodU64::from(current.checked_add(1).unwrap());
+    Ok(())
 }

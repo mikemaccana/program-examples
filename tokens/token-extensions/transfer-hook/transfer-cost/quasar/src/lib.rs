@@ -33,7 +33,7 @@ mod quasar_transfer_hook_cost {
     pub fn initialize_extra_account_meta_list(
         ctx: Ctx<InitializeExtraAccountMetaList>,
     ) -> Result<(), ProgramError> {
-        ctx.accounts.initialize_extra_account_meta_list()
+        handle_initialize_extra_account_meta_list(&mut ctx.accounts)
     }
 
     /// Transfer hook handler — validates the amount and increments the counter.
@@ -41,7 +41,7 @@ mod quasar_transfer_hook_cost {
     /// Discriminator = sha256("spl-transfer-hook-interface:execute")[:8]
     #[instruction(discriminator = [105, 37, 101, 197, 75, 251, 102, 26])]
     pub fn transfer_hook(ctx: Ctx<TransferHook>, amount: u64) -> Result<(), ProgramError> {
-        ctx.accounts.transfer_hook(amount)
+        handle_transfer_hook(&mut ctx.accounts, amount)
     }
 }
 
@@ -61,19 +61,20 @@ pub struct InitializeExtraAccountMetaList {
     pub system_program: Program<System>,
 }
 
-impl InitializeExtraAccountMetaList {
-    #[inline(always)]
-    pub fn initialize_extra_account_meta_list(&mut self) -> Result<(), ProgramError> {
+#[inline(always)]
+fn handle_initialize_extra_account_meta_list(
+    accounts: &mut InitializeExtraAccountMetaList,
+) -> Result<(), ProgramError> {
         // Create ExtraAccountMetaList PDA with 1 extra account: counter
         let meta_list_size: u64 = 51;
         let lamports = Rent::get()?.try_minimum_balance(meta_list_size as usize)?;
 
-        let mint_address = self.mint.to_account_view().address();
+        let mint_address = accounts.mint.to_account_view().address();
         let (expected_pda, bump) = Address::find_program_address(
             &[b"extra-account-metas", mint_address.as_ref()],
             &crate::ID,
         );
-        if self.extra_account_meta_list.to_account_view().address() != &expected_pda {
+        if accounts.extra_account_meta_list.to_account_view().address() != &expected_pda {
             return Err(ProgramError::InvalidSeeds);
         }
 
@@ -83,13 +84,14 @@ impl InitializeExtraAccountMetaList {
             Seed::from(mint_address.as_ref()),
             Seed::from(&bump_bytes as &[u8]),
         ];
-        self.system_program
-            .create_account(&self.payer, &*self.extra_account_meta_list, lamports, meta_list_size, &crate::ID)
+        accounts
+            .system_program
+            .create_account(&accounts.payer, &*accounts.extra_account_meta_list, lamports, meta_list_size, &crate::ID)
             .invoke_signed(&seeds)?;
 
         // Write TLV data
         let view = unsafe {
-            &mut *(self.extra_account_meta_list as *const UncheckedAccount
+            &mut *(accounts.extra_account_meta_list as *const UncheckedAccount
                 as *mut UncheckedAccount as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;
@@ -114,7 +116,7 @@ impl InitializeExtraAccountMetaList {
 
         let (counter_pda, counter_bump) =
             Address::find_program_address(&[b"counter"], &crate::ID);
-        if self.counter_account.to_account_view().address() != &counter_pda {
+        if accounts.counter_account.to_account_view().address() != &counter_pda {
             return Err(ProgramError::InvalidSeeds);
         }
 
@@ -123,13 +125,13 @@ impl InitializeExtraAccountMetaList {
             Seed::from(b"counter" as &[u8]),
             Seed::from(&counter_bump_bytes as &[u8]),
         ];
-        self.system_program
-            .create_account(&self.payer, &*self.counter_account, counter_lamports, counter_size, &crate::ID)
+        accounts
+            .system_program
+            .create_account(&accounts.payer, &*accounts.counter_account, counter_lamports, counter_size, &crate::ID)
             .invoke_signed(&counter_seeds)?;
 
         log("Transfer cost hook initialized");
         Ok(())
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -147,9 +149,8 @@ pub struct TransferHook {
     pub counter_account: UncheckedAccount,
 }
 
-impl TransferHook {
-    #[inline(always)]
-    pub fn transfer_hook(&mut self, amount: u64) -> Result<(), ProgramError> {
+#[inline(always)]
+fn handle_transfer_hook(accounts: &mut TransferHook, amount: u64) -> Result<(), ProgramError> {
         // Validate amount
         if amount > 50 {
             log("Warning: large transfer amount");
@@ -157,7 +158,7 @@ impl TransferHook {
 
         // Increment transfer counter
         let view = unsafe {
-            &mut *(self.counter_account as *const UncheckedAccount as *mut UncheckedAccount
+            &mut *(accounts.counter_account as *const UncheckedAccount as *mut UncheckedAccount
                 as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;
@@ -181,5 +182,4 @@ impl TransferHook {
 
         log("Transfer cost hook: counter incremented");
         Ok(())
-    }
 }

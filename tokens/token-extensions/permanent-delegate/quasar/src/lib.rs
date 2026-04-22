@@ -27,7 +27,7 @@ mod quasar_permanent_delegate {
 
     #[instruction(discriminator = 0)]
     pub fn initialize(ctx: Ctx<Initialize>) -> Result<(), ProgramError> {
-        ctx.accounts.initialize()
+        handle_initialize(&mut ctx.accounts)
     }
 }
 
@@ -41,53 +41,52 @@ pub struct Initialize {
     pub system_program: Program<System>,
 }
 
-impl Initialize {
-    #[inline(always)]
-    pub fn initialize(&mut self) -> Result<(), ProgramError> {
-        // 165 (base) + 1 (account type) + 4 (TLV header) + 32 (PermanentDelegate data) = 202 bytes
-        let mint_size: u64 = 202;
-        let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
+#[inline(always)]
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
+    // 165 (base) + 1 (account type) + 4 (TLV header) + 32 (PermanentDelegate data) = 202 bytes
+    let mint_size: u64 = 202;
+    let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
-        self.system_program
-            .create_account(
-                &self.payer,
-                &self.mint_account,
-                lamports,
-                mint_size,
-                self.token_program.to_account_view().address(),
-            )
-            .invoke()?;
-
-        // InitializePermanentDelegate: opcode 35, delegate pubkey (32 bytes, not COption)
-        let mut ext_data = [0u8; 33];
-        ext_data[0] = 35;
-        ext_data[1..33].copy_from_slice(self.payer.to_account_view().address().as_ref());
-
-        CpiCall::new(
-            self.token_program.to_account_view().address(),
-            [InstructionAccount::writable(
-                self.mint_account.to_account_view().address(),
-            )],
-            [self.mint_account.to_account_view()],
-            ext_data,
+    accounts
+        .system_program
+        .create_account(
+            &accounts.payer,
+            &accounts.mint_account,
+            lamports,
+            mint_size,
+            accounts.token_program.to_account_view().address(),
         )
         .invoke()?;
 
-        // InitializeMint2
-        let mut mint_data = [0u8; 67];
-        mint_data[0] = 20;
-        mint_data[1] = 2;
-        mint_data[2..34].copy_from_slice(self.payer.to_account_view().address().as_ref());
-        mint_data[34] = 0; // no freeze authority
+    // InitializePermanentDelegate: opcode 35, delegate pubkey (32 bytes, not COption)
+    let mut ext_data = [0u8; 33];
+    ext_data[0] = 35;
+    ext_data[1..33].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
 
-        CpiCall::new(
-            self.token_program.to_account_view().address(),
-            [InstructionAccount::writable(
-                self.mint_account.to_account_view().address(),
-            )],
-            [self.mint_account.to_account_view()],
-            mint_data,
-        )
-        .invoke()
-    }
+    CpiCall::new(
+        accounts.token_program.to_account_view().address(),
+        [InstructionAccount::writable(
+            accounts.mint_account.to_account_view().address(),
+        )],
+        [accounts.mint_account.to_account_view()],
+        ext_data,
+    )
+    .invoke()?;
+
+    // InitializeMint2
+    let mut mint_data = [0u8; 67];
+    mint_data[0] = 20;
+    mint_data[1] = 2;
+    mint_data[2..34].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
+    mint_data[34] = 0; // no freeze authority
+
+    CpiCall::new(
+        accounts.token_program.to_account_view().address(),
+        [InstructionAccount::writable(
+            accounts.mint_account.to_account_view().address(),
+        )],
+        [accounts.mint_account.to_account_view()],
+        mint_data,
+    )
+    .invoke()
 }

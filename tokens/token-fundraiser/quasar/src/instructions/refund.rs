@@ -25,26 +25,24 @@ pub struct Refund {
     pub token_program: Program<Token>,
 }
 
-impl Refund {
-    #[inline(always)]
-    pub fn refund(&mut self, bumps: &RefundBumps) -> Result<(), ProgramError> {
-        let refund_amount = self.contributor_account.amount;
+#[inline(always)]
+pub fn handle_refund(accounts: &mut Refund, bumps: &RefundBumps) -> Result<(), ProgramError> {
+    let refund_amount = accounts.contributor_account.amount;
 
-        let seeds = self.fundraiser_seeds(bumps);
+    let seeds = accounts.fundraiser_seeds(bumps);
 
-        // Transfer contributor's tokens back from vault
-        self.token_program
-            .transfer(&self.vault, &self.contributor_ta, &self.fundraiser, refund_amount)
-            .invoke_signed(&seeds)?;
+    // Transfer contributor's tokens back from vault
+    accounts.token_program
+        .transfer(&accounts.vault, &accounts.contributor_ta, &accounts.fundraiser, refund_amount)
+        .invoke_signed(&seeds)?;
 
-        // Update fundraiser state
-        self.fundraiser.current_amount = self.fundraiser.current_amount
-            .checked_sub(refund_amount)
-            .ok_or(ProgramError::ArithmeticOverflow)?;
+    // Update fundraiser state
+    accounts.fundraiser.current_amount = accounts.fundraiser.current_amount
+        .checked_sub(refund_amount)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
 
-        // Zero out contributor amount
-        self.contributor_account.set_inner(0);
+    // Zero out contributor amount
+    accounts.contributor_account.set_inner(0);
 
-        Ok(())
-    }
+    Ok(())
 }

@@ -37,7 +37,7 @@ mod quasar_transfer_hook_hello_world {
     /// Custom discriminator (not part of the transfer hook interface).
     #[instruction(discriminator = [0, 0, 0, 0, 0, 0, 0, 1])]
     pub fn initialize(ctx: Ctx<Initialize>, decimals: u8) -> Result<(), ProgramError> {
-        ctx.accounts.initialize(decimals)
+        handle_initialize(&mut ctx.accounts, decimals)
     }
 
     /// Create the ExtraAccountMetaList PDA (empty — no extra accounts).
@@ -46,14 +46,14 @@ mod quasar_transfer_hook_hello_world {
     pub fn initialize_extra_account_meta_list(
         ctx: Ctx<InitializeExtraAccountMetaList>,
     ) -> Result<(), ProgramError> {
-        ctx.accounts.initialize_extra_account_meta_list()
+        handle_initialize_extra_account_meta_list(&mut ctx.accounts)
     }
 
     /// Transfer hook handler — called automatically by Token-2022 during transfers.
     /// Discriminator = sha256("spl-transfer-hook-interface:execute")[:8]
     #[instruction(discriminator = [105, 37, 101, 197, 75, 251, 102, 26])]
     pub fn transfer_hook(ctx: Ctx<TransferHook>, _amount: u64) -> Result<(), ProgramError> {
-        ctx.accounts.transfer_hook()
+        handle_transfer_hook(&mut ctx.accounts)
     }
 }
 
@@ -71,22 +71,21 @@ pub struct Initialize {
     pub system_program: Program<System>,
 }
 
-impl Initialize {
-    #[inline(always)]
-    pub fn initialize(&mut self, decimals: u8) -> Result<(), ProgramError> {
+#[inline(always)]
+fn handle_initialize(accounts: &mut Initialize, decimals: u8) -> Result<(), ProgramError> {
         // Mint with TransferHook extension:
         //   165 (base account + padding) + 1 (account type) + 4 (TLV header) + 64 (extension) = 234
         let mint_size: u64 = 234;
         let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
         // 1. Create account owned by Token-2022
-        self.system_program
+        accounts.system_program
             .create_account(
-                &self.payer,
-                &self.mint_account,
+                &accounts.payer,
+                &accounts.mint_account,
                 lamports,
                 mint_size,
-                self.token_program.to_account_view().address(),
+                accounts.token_program.to_account_view().address(),
             )
             .invoke()?;
 
@@ -96,15 +95,15 @@ impl Initialize {
         let mut ext_data = [0u8; 66];
         ext_data[0] = 36; // TokenInstruction::TransferHookExtension
         ext_data[1] = 0; // TransferHookInstruction::Initialize
-        ext_data[2..34].copy_from_slice(self.payer.to_account_view().address().as_ref());
+        ext_data[2..34].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
         ext_data[34..66].copy_from_slice(crate::ID.as_ref());
 
         CpiCall::new(
-            self.token_program.to_account_view().address(),
+            accounts.token_program.to_account_view().address(),
             [InstructionAccount::writable(
-                self.mint_account.to_account_view().address(),
+                accounts.mint_account.to_account_view().address(),
             )],
-            [self.mint_account.to_account_view()],
+            [accounts.mint_account.to_account_view()],
             ext_data,
         )
         .invoke()?;
@@ -113,20 +112,19 @@ impl Initialize {
         let mut mint_data = [0u8; 67];
         mint_data[0] = 20;
         mint_data[1] = decimals;
-        mint_data[2..34].copy_from_slice(self.payer.to_account_view().address().as_ref());
+        mint_data[2..34].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
         mint_data[34] = 1; // has freeze authority
-        mint_data[35..67].copy_from_slice(self.payer.to_account_view().address().as_ref());
+        mint_data[35..67].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
 
         CpiCall::new(
-            self.token_program.to_account_view().address(),
+            accounts.token_program.to_account_view().address(),
             [InstructionAccount::writable(
-                self.mint_account.to_account_view().address(),
+                accounts.mint_account.to_account_view().address(),
             )],
-            [self.mint_account.to_account_view()],
+            [accounts.mint_account.to_account_view()],
             mint_data,
         )
         .invoke()
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -144,9 +142,10 @@ pub struct InitializeExtraAccountMetaList {
     pub system_program: Program<System>,
 }
 
-impl InitializeExtraAccountMetaList {
-    #[inline(always)]
-    pub fn initialize_extra_account_meta_list(&mut self) -> Result<(), ProgramError> {
+#[inline(always)]
+fn handle_initialize_extra_account_meta_list(
+    accounts: &mut InitializeExtraAccountMetaList,
+) -> Result<(), ProgramError> {
         use quasar_lang::cpi::Seed;
 
         // ExtraAccountMetaList with 0 extra accounts:
@@ -158,13 +157,13 @@ impl InitializeExtraAccountMetaList {
         let lamports = Rent::get()?.try_minimum_balance(meta_list_size as usize)?;
 
         // Derive PDA
-        let mint_address = self.mint.to_account_view().address();
+        let mint_address = accounts.mint.to_account_view().address();
         let (expected_pda, bump) = Address::find_program_address(
             &[b"extra-account-metas", mint_address.as_ref()],
             &crate::ID,
         );
 
-        let meta_list_address = self.extra_account_meta_list.to_account_view().address();
+        let meta_list_address = accounts.extra_account_meta_list.to_account_view().address();
         if meta_list_address != &expected_pda {
             return Err(ProgramError::InvalidSeeds);
         }
@@ -177,10 +176,11 @@ impl InitializeExtraAccountMetaList {
             Seed::from(&bump_bytes as &[u8]),
         ];
 
-        self.system_program
+        accounts
+            .system_program
             .create_account(
-                &self.payer,
-                &*self.extra_account_meta_list,
+                &accounts.payer,
+                &*accounts.extra_account_meta_list,
                 lamports,
                 meta_list_size,
                 &crate::ID,
@@ -191,7 +191,7 @@ impl InitializeExtraAccountMetaList {
         // SAFETY: Account was just created (16 bytes) and is owned by this program.
         // UncheckedAccount is #[repr(transparent)] over AccountView, so the cast is safe.
         let view = unsafe {
-            &mut *(self.extra_account_meta_list as *const UncheckedAccount as *mut UncheckedAccount
+            &mut *(accounts.extra_account_meta_list as *const UncheckedAccount as *mut UncheckedAccount
                 as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;
@@ -204,7 +204,6 @@ impl InitializeExtraAccountMetaList {
 
         log("Extra account meta list initialized");
         Ok(())
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -225,9 +224,8 @@ pub struct TransferHook {
     pub extra_account_meta_list: UncheckedAccount,
 }
 
-impl TransferHook {
-    #[inline(always)]
-    pub fn transfer_hook(&mut self) -> Result<(), ProgramError> {
+#[inline(always)]
+fn handle_transfer_hook(_accounts: &mut TransferHook) -> Result<(), ProgramError> {
         // In production, verify the source token's TransferHookAccount.transferring
         // flag is set. The Token-2022 program sets this before invoking the hook
         // and clears it after, preventing standalone invocation.
@@ -235,5 +233,4 @@ impl TransferHook {
         // For this hello-world example, we simply log a message.
         log("Hello Transfer Hook!");
         Ok(())
-    }
 }

@@ -14,10 +14,8 @@ pub struct InitializeCounter {
     pub system_program: Program<System>,
 }
 
-impl InitializeCounter {
-    #[inline(always)]
-    pub fn initialize_counter(&mut self) -> Result<(), ProgramError> {
-        self.counter.set_inner(0u64);
-        Ok(())
-    }
+#[inline(always)]
+pub fn handle_initialize_counter(accounts: &mut InitializeCounter) -> Result<(), ProgramError> {
+    accounts.counter.set_inner(0u64);
+    Ok(())
 }

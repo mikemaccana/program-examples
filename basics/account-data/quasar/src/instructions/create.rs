@@ -15,21 +15,20 @@ pub struct CreateAddressInfo {
     pub system_program: Program<System>,
 }
 
-impl CreateAddressInfo {
-    #[inline(always)]
-    pub fn create_address_info(
-        &mut self, name: &str,
-        house_number: u8,
-        street: &str,
-        city: &str,
-    ) -> Result<(), ProgramError> {
-        self.address_info.set_inner(
-            house_number,
-            name,
-            street,
-            city,
-            self.payer.to_account_view(),
-            None,
-        )
-    }
+#[inline(always)]
+pub fn handle_create_address_info(
+    accounts: &mut CreateAddressInfo,
+    name: &str,
+    house_number: u8,
+    street: &str,
+    city: &str,
+) -> Result<(), ProgramError> {
+    accounts.address_info.set_inner(
+        house_number,
+        name,
+        street,
+        city,
+        accounts.payer.to_account_view(),
+        None,
+    )
 }
