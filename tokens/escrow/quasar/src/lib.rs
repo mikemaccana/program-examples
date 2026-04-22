@@ -19,18 +19,18 @@ mod quasar_escrow {
 
     #[instruction(discriminator = 0)]
     pub fn make(ctx: Ctx<Make>, deposit: u64, receive: u64) -> Result<(), ProgramError> {
-        ctx.accounts.make_escrow(receive, &ctx.bumps)?;
-        ctx.accounts.deposit_tokens(deposit)
+        instructions::make::handle_make_escrow(&mut ctx.accounts, receive, &ctx.bumps)?;
+        instructions::make::handle_deposit_tokens(&mut ctx.accounts, deposit)
     }
 
     #[instruction(discriminator = 1)]
     pub fn take(ctx: Ctx<Take>) -> Result<(), ProgramError> {
-        ctx.accounts.transfer_tokens()?;
-        ctx.accounts.withdraw_tokens_and_close(&ctx.bumps)
+        instructions::take::handle_transfer_tokens(&mut ctx.accounts)?;
+        instructions::take::handle_withdraw_tokens_and_close_take(&mut ctx.accounts, &ctx.bumps)
     }
 
     #[instruction(discriminator = 2)]
     pub fn refund(ctx: Ctx<Refund>) -> Result<(), ProgramError> {
-        ctx.accounts.withdraw_tokens_and_close(&ctx.bumps)
+        instructions::refund::handle_withdraw_tokens_and_close_refund(&mut ctx.accounts, &ctx.bumps)
     }
 }
