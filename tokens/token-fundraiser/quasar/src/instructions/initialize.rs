@@ -18,26 +18,24 @@ pub struct Initialize {
     pub system_program: Program<System>,
 }
 
-impl Initialize {
-    #[inline(always)]
-    pub fn initialize(
-        &mut self,
-        amount_to_raise: u64,
-        duration: u16,
-        bump: u8,
-    ) -> Result<(), ProgramError> {
-        // Validate minimum raise amount
-        require!(amount_to_raise > 0, ProgramError::InvalidArgument);
+#[inline(always)]
+pub fn handle_initialize(
+    accounts: &mut Initialize,
+    amount_to_raise: u64,
+    duration: u16,
+    bump: u8,
+) -> Result<(), ProgramError> {
+    // Validate minimum raise amount
+    require!(amount_to_raise > 0, ProgramError::InvalidArgument);
 
-        self.fundraiser.set_inner(
-            *self.maker.address(),
-            *self.mint_to_raise.address(),
-            amount_to_raise,
-            0,  // current_amount starts at 0
-            0,  // time_started — would be Clock::get() onchain
-            duration,
-            bump,
-        );
-        Ok(())
-    }
+    accounts.fundraiser.set_inner(
+        *accounts.maker.address(),
+        *accounts.mint_to_raise.address(),
+        amount_to_raise,
+        0,  // current_amount starts at 0
+        0,  // time_started — would be Clock::get() onchain
+        duration,
+        bump,
+    );
+    Ok(())
 }

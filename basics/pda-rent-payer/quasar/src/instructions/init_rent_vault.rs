@@ -13,11 +13,9 @@ pub struct InitRentVault {
     pub system_program: Program<System>,
 }
 
-impl InitRentVault {
-    #[inline(always)]
-    pub fn init_rent_vault(&mut self, fund_lamports: u64) -> Result<(), ProgramError> {
-        self.system_program
-            .transfer(&self.payer, &self.rent_vault, fund_lamports)
-            .invoke()
-    }
+#[inline(always)]
+pub fn handle_init_rent_vault(accounts: &mut InitRentVault, fund_lamports: u64) -> Result<(), ProgramError> {
+    accounts.system_program
+        .transfer(&accounts.payer, &accounts.rent_vault, fund_lamports)
+        .invoke()
 }

@@ -22,5 +22,5 @@ node_modules/
 
 /target
 deploy
-.claude
 .claire
+.claude

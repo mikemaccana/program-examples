@@ -26,23 +26,21 @@ pub struct Refund {
     pub system_program: Program<System>,
 }
 
-impl Refund {
-    #[inline(always)]
-    pub fn withdraw_tokens_and_close(&mut self, bumps: &RefundBumps) -> Result<(), ProgramError> {
-        let seeds = self.escrow_seeds(bumps);
+#[inline(always)]
+pub fn handle_withdraw_tokens_and_close_refund(accounts: &mut Refund, bumps: &RefundBumps) -> Result<(), ProgramError> {
+    let seeds = accounts.escrow_seeds(bumps);
 
-        self.token_program
-            .transfer(
-                &self.vault_ta_a,
-                &self.maker_ta_a,
-                &self.escrow,
-                self.vault_ta_a.amount(),
-            )
-            .invoke_signed(&seeds)?;
+    accounts.token_program
+        .transfer(
+            &accounts.vault_ta_a,
+            &accounts.maker_ta_a,
+            &accounts.escrow,
+            accounts.vault_ta_a.amount(),
+        )
+        .invoke_signed(&seeds)?;
 
-        self.token_program
-            .close_account(&self.vault_ta_a, &self.maker, &self.escrow)
-            .invoke_signed(&seeds)?;
-        Ok(())
-    }
+    accounts.token_program
+        .close_account(&accounts.vault_ta_a, &accounts.maker, &accounts.escrow)
+        .invoke_signed(&seeds)?;
+    Ok(())
 }

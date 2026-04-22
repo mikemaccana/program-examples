@@ -11,20 +11,18 @@ pub struct CreateSystemAccount {
     pub system_program: Program<System>,
 }
 
-impl CreateSystemAccount {
-    #[inline(always)]
-    pub fn create_system_account(&mut self) -> Result<(), ProgramError> {
-        // Create a zero-data account owned by the system program,
-        // funded with the minimum rent-exempt balance.
-        let system_program_address = Address::default();
-        self.system_program
-            .create_account_with_minimum_balance(
-                &self.payer,
-                &self.new_account,
-                0, // space: zero bytes of data
-                &system_program_address,
-                None, // fetch Rent sysvar automatically
-            )?
-            .invoke()
-    }
+#[inline(always)]
+pub fn handle_create_system_account(accounts: &mut CreateSystemAccount) -> Result<(), ProgramError> {
+    // Create a zero-data account owned by the system program,
+    // funded with the minimum rent-exempt balance.
+    let system_program_address = Address::default();
+    accounts.system_program
+        .create_account_with_minimum_balance(
+            &accounts.payer,
+            &accounts.new_account,
+            0, // space: zero bytes of data
+            &system_program_address,
+            None, // fetch Rent sysvar automatically
+        )?
+        .invoke()
 }

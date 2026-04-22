@@ -30,35 +30,33 @@ pub struct CreateToken {
     pub rent: Sysvar<Rent>,
 }
 
-impl CreateToken {
-    #[inline(always)]
-    pub fn create_token(
-        &mut self,
-        token_name: &str,
-        token_symbol: &str,
-        token_uri: &str,
-    ) -> Result<(), ProgramError> {
-        log("Creating metadata account");
+#[inline(always)]
+pub fn handle_create_token(
+    accounts: &mut CreateToken,
+    token_name: &str,
+    token_symbol: &str,
+    token_uri: &str,
+) -> Result<(), ProgramError> {
+    log("Creating metadata account");
 
-        self.token_metadata_program
-            .create_metadata_accounts_v3(
-                &self.metadata_account,
-                &self.mint_account,
-                &self.payer, // mint_authority
-                &self.payer, // payer
-                &self.payer, // update_authority
-                &self.system_program,
-                &self.rent,
-                token_name,
-                token_symbol,
-                token_uri,
-                0,     // seller_fee_basis_points
-                false, // is_mutable
-                true,  // update_authority_is_signer
-            )
-            .invoke()?;
+    accounts.token_metadata_program
+        .create_metadata_accounts_v3(
+            &accounts.metadata_account,
+            &accounts.mint_account,
+            &accounts.payer, // mint_authority
+            &accounts.payer, // payer
+            &accounts.payer, // update_authority
+            &accounts.system_program,
+            &accounts.rent,
+            token_name,
+            token_symbol,
+            token_uri,
+            0,     // seller_fee_basis_points
+            false, // is_mutable
+            true,  // update_authority_is_signer
+        )
+        .invoke()?;
 
-        log("Token created successfully.");
-        Ok(())
-    }
+    log("Token created successfully.");
+    Ok(())
 }
