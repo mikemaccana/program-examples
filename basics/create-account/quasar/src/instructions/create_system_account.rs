@@ -27,5 +27,5 @@ pub fn handle_create_system_account(
             &system_program_address,
             None, // fetch Rent sysvar automatically
         )?
-        .invoke()
+        .invoke();
 }
