@@ -1,7 +1,5 @@
-use {
-    crate::state::Counter,
-    quasar_lang::prelude::*,
-};
+use crate::state::{Counter, CounterInner};
+use quasar_lang::prelude::*;
 
 /// Accounts for creating a new counter.
 /// The counter is derived as a PDA from ["counter", payer] seeds.
@@ -16,6 +14,6 @@ pub struct InitializeCounter {
 
 #[inline(always)]
 pub fn handle_initialize_counter(accounts: &mut InitializeCounter) -> Result<(), ProgramError> {
-    accounts.counter.set_inner(0u64);
+    accounts.counter.set_inner(CounterInner { count: 0 });
     Ok(())
 }

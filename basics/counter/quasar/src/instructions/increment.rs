@@ -1,7 +1,4 @@
-use {
-    crate::state::Counter,
-    quasar_lang::prelude::*,
-};
+use {crate::state::Counter, quasar_lang::prelude::*};
 
 /// Accounts for incrementing a counter.
 #[derive(Accounts)]

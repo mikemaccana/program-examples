@@ -1,17 +1,15 @@
 use {
-    crate::state::AddressInfo,
-    quasar_lang::prelude::*,
+    crate::state::{AddressInfo, AddressInfoInner},
+    quasar_lang::{prelude::*, sysvars::Sysvar},
 };
 
 /// Accounts for creating a new address info account.
-/// Dynamic accounts use owned `Account<T>` rather than `&'info mut Account<T>` because
-/// dynamic types carry cached byte offsets that cannot be represented as a pointer cast.
 #[derive(Accounts)]
 pub struct CreateAddressInfo {
     #[account(mut)]
     pub payer: Signer,
     #[account(mut, init, payer = payer, seeds = AddressInfo::seeds(payer), bump)]
-    pub address_info: Account<AddressInfo<'_>>,
+    pub address_info: Account<AddressInfo>,
     pub system_program: Program<System>,
 }
 
@@ -23,12 +21,11 @@ pub fn handle_create_address_info(
     street: &str,
     city: &str,
 ) -> Result<(), ProgramError> {
+    let rent = Rent::get()?;
     accounts.address_info.set_inner(
-        house_number,
-        name,
-        street,
-        city,
+        AddressInfoInner { house_number, name, street, city },
         accounts.payer.to_account_view(),
-        None,
+        rent.lamports_per_byte(),
+        rent.exemption_threshold_raw(),
     )
 }

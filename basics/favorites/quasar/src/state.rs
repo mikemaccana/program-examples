@@ -9,5 +9,5 @@ use quasar_lang::prelude::*;
 #[seeds(b"favorites", user: Address)]
 pub struct Favorites<'a> {
     pub number: u64,
-    pub color: String<u8, 50>,
+    pub color: String<50>,
 }

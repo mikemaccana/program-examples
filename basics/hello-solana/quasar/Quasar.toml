@@ -5,18 +5,4 @@ name = "quasar_hello_solana"
 type = "solana"
 
 [testing]
-language = "rust"
-
-[testing.rust]
-framework = "quasar-svm"
-
-[testing.rust.test]
-program = "cargo"
-args = [
-    "test",
-    "tests::",
-]
-
-[clients]
-path = "target/client"
-languages = ["rust"]
+framework = "quasarsvm-rust"

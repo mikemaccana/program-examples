@@ -12,11 +12,14 @@ pub struct CreateSystemAccount {
 }
 
 #[inline(always)]
-pub fn handle_create_system_account(accounts: &mut CreateSystemAccount) -> Result<(), ProgramError> {
+pub fn handle_create_system_account(
+    accounts: &mut CreateSystemAccount,
+) -> Result<(), ProgramError> {
     // Create a zero-data account owned by the system program,
     // funded with the minimum rent-exempt balance.
     let system_program_address = Address::default();
-    accounts.system_program
+    accounts
+        .system_program
         .create_account_with_minimum_balance(
             &accounts.payer,
             &accounts.new_account,
