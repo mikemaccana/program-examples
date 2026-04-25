@@ -1,5 +1,5 @@
 use crate::*;
-use quasar_lang::cpi::{InstructionAccount, InstructionView, Seed, Signer};
+use quasar_lang::{cpi::{InstructionAccount, InstructionView, Seed, Signer}, remaining::RemainingAccounts};
 
 /// Maximum proof nodes per tree.
 const MAX_PROOF_NODES: usize = 24;
@@ -45,10 +45,9 @@ pub struct WithdrawTwo {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn handle_withdraw_two_cnfts(accounts: &mut WithdrawTwo, ctx: &CtxWithRemaining<WithdrawTwo>) -> Result<(), ProgramError> {
+pub fn handle_withdraw_two_cnfts(accounts: &mut WithdrawTwo, data: &[u8], remaining: RemainingAccounts<'_>, leaf_owner_bump: u8) -> Result<(), ProgramError> {
     // Parse instruction args:
     // args1(108) + proof_1_length(1) + args2(108) + _proof_2_length(1) = 218 bytes
-    let data = ctx.data;
     if data.len() < 218 {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -59,7 +58,7 @@ pub fn handle_withdraw_two_cnfts(accounts: &mut WithdrawTwo, ctx: &CtxWithRemain
     // _proof_2_length at data[217] — not needed, remaining after proof1 is proof2
 
     // PDA signer seeds
-    let bump_bytes = [ctx.bumps.leaf_owner];
+    let bump_bytes = [leaf_owner_bump];
     let seeds: [Seed; 2] = [
         Seed::from(b"cNFT-vault" as &[u8]),
         Seed::from(&bump_bytes as &[u8]),
@@ -67,7 +66,6 @@ pub fn handle_withdraw_two_cnfts(accounts: &mut WithdrawTwo, ctx: &CtxWithRemain
     let signer = Signer::from(&seeds as &[Seed]);
 
     // Collect all remaining accounts (proof1 ++ proof2)
-    let remaining = ctx.remaining_accounts();
     let placeholder = accounts.system_program.to_account_view().clone();
     let mut all_proofs: [AccountView; MAX_PROOF_NODES * 2] =
         core::array::from_fn(|_| placeholder.clone());

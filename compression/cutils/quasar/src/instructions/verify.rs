@@ -1,6 +1,6 @@
 use crate::bubblegum_types::{get_asset_id, leaf_schema_v1_hash};
 use crate::*;
-use quasar_lang::cpi::{InstructionAccount, InstructionView};
+use quasar_lang::{cpi::{InstructionAccount, InstructionView}, remaining::RemainingAccounts};
 
 /// Maximum proof nodes for the merkle tree.
 const MAX_PROOF_NODES: usize = 24;
@@ -24,10 +24,9 @@ pub struct Verify {
     pub compression_program: UncheckedAccount,
 }
 
-pub fn handle_verify(accounts: &mut Verify, ctx: &CtxWithRemaining<Verify>) -> Result<(), ProgramError> {
+pub fn handle_verify(accounts: &mut Verify, data: &[u8], remaining: RemainingAccounts<'_>) -> Result<(), ProgramError> {
     // Parse verify params from instruction data:
     // root(32) + data_hash(32) + creator_hash(32) + nonce(8) + index(4) = 108 bytes
-    let data = ctx.data;
     if data.len() < 108 {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -57,7 +56,6 @@ pub fn handle_verify(accounts: &mut Verify, ctx: &CtxWithRemaining<Verify>) -> R
     ix_data[72..76].copy_from_slice(&index.to_le_bytes());
 
     // Collect proof nodes
-    let remaining = ctx.remaining_accounts();
     let placeholder = accounts.compression_program.to_account_view().clone();
     let mut proof_views: [AccountView; MAX_PROOF_NODES] =
         core::array::from_fn(|_| placeholder.clone());

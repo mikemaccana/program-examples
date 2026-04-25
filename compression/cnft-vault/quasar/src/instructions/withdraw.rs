@@ -1,5 +1,5 @@
 use crate::*;
-use quasar_lang::cpi::{InstructionAccount, InstructionView, Seed, Signer};
+use quasar_lang::{cpi::{InstructionAccount, InstructionView, Seed, Signer}, remaining::RemainingAccounts};
 
 /// Maximum proof nodes for the merkle tree.
 const MAX_PROOF_NODES: usize = 24;
@@ -43,8 +43,7 @@ fn build_transfer_data(args: &[u8]) -> [u8; 8 + TRANSFER_ARGS_LEN] {
     ix_data
 }
 
-pub fn handle_withdraw_cnft(accounts: &mut Withdraw, ctx: &CtxWithRemaining<Withdraw>) -> Result<(), ProgramError> {
-    let data = ctx.data;
+pub fn handle_withdraw_cnft(accounts: &mut Withdraw, data: &[u8], remaining: RemainingAccounts<'_>, leaf_owner_bump: u8) -> Result<(), ProgramError> {
     if data.len() < TRANSFER_ARGS_LEN {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -52,7 +51,6 @@ pub fn handle_withdraw_cnft(accounts: &mut Withdraw, ctx: &CtxWithRemaining<With
     let ix_data = build_transfer_data(&data[0..TRANSFER_ARGS_LEN]);
 
     // Collect proof nodes
-    let remaining = ctx.remaining_accounts();
     let placeholder = accounts.system_program.to_account_view().clone();
     let mut proof_views: [AccountView; MAX_PROOF_NODES] =
         core::array::from_fn(|_| placeholder.clone());
@@ -113,7 +111,7 @@ pub fn handle_withdraw_cnft(accounts: &mut Withdraw, ctx: &CtxWithRemaining<With
     };
 
     // PDA signer seeds: ["cNFT-vault", bump]
-    let bump_bytes = [ctx.bumps.leaf_owner];
+    let bump_bytes = [leaf_owner_bump];
     let seeds: [Seed; 2] = [
         Seed::from(b"cNFT-vault" as &[u8]),
         Seed::from(&bump_bytes as &[u8]),

@@ -1,4 +1,4 @@
-use quasar_lang::prelude::*;
+use quasar_lang::{prelude::*, sysvars::Sysvar};
 
 /// Accounts for creating a system account sized for address data.
 #[derive(Accounts)]
@@ -18,20 +18,12 @@ pub fn handle_create_system_account(accounts: &mut CreateSystemAccount, name: &s
 
     log("Program invoked. Creating a system account...");
 
-    // The owner of the new account is the system program.
     let system_program_address = Address::default();
+    let rent = Rent::get()?;
+    let lamports = rent.minimum_balance_unchecked(space);
 
-    // Create the account with the computed space.
-    // create_account_with_minimum_balance automatically fetches Rent
-    // sysvar and calculates the minimum rent-exempt lamports.
     accounts.system_program
-        .create_account_with_minimum_balance(
-            &accounts.payer,
-            &accounts.new_account,
-            space as u64,
-            &system_program_address,
-            None, // fetch Rent sysvar automatically
-        )?
+        .create_account(&accounts.payer, &accounts.new_account, lamports, space as u64, &system_program_address)
         .invoke()?;
 
     log("Account created successfully.");

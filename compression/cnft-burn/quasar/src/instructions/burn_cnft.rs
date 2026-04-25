@@ -1,5 +1,5 @@
 use crate::*;
-use quasar_lang::cpi::{InstructionAccount, InstructionView};
+use quasar_lang::{cpi::{InstructionAccount, InstructionView}, remaining::RemainingAccounts};
 
 /// Maximum number of proof nodes for the merkle tree.
 /// Concurrent merkle trees support up to depth 30, but typical depth is 14-20.
@@ -30,10 +30,9 @@ pub struct BurnCnft {
     pub system_program: Program<System>,
 }
 
-pub fn handle_burn_cnft(accounts: &mut BurnCnft, ctx: &CtxWithRemaining<BurnCnft>) -> Result<(), ProgramError> {
+pub fn handle_burn_cnft(accounts: &mut BurnCnft, data: &[u8], remaining: RemainingAccounts<'_>) -> Result<(), ProgramError> {
     // Parse instruction args from raw data:
     // root(32) + data_hash(32) + creator_hash(32) + nonce(8) + index(4) = 108 bytes
-    let data = ctx.data;
     if data.len() < 108 {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -45,7 +44,6 @@ pub fn handle_burn_cnft(accounts: &mut BurnCnft, ctx: &CtxWithRemaining<BurnCnft
     ix_data[8..116].copy_from_slice(&data[0..108]);
 
     // Collect remaining accounts (proof nodes) into a stack buffer
-    let remaining = ctx.remaining_accounts();
     let placeholder = accounts.system_program.to_account_view().clone();
     let mut proof_views: [AccountView; MAX_PROOF_NODES] =
         core::array::from_fn(|_| placeholder.clone());

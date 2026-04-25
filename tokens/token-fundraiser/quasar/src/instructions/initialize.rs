@@ -1,5 +1,5 @@
 use {
-    crate::state::Fundraiser,
+    crate::state::{Fundraiser, FundraiserInner},
     quasar_lang::prelude::*,
     quasar_spl::{Mint, Token},
 };
@@ -28,14 +28,14 @@ pub fn handle_initialize(
     // Validate minimum raise amount
     require!(amount_to_raise > 0, ProgramError::InvalidArgument);
 
-    accounts.fundraiser.set_inner(
-        *accounts.maker.address(),
-        *accounts.mint_to_raise.address(),
+    accounts.fundraiser.set_inner(FundraiserInner {
+        maker: *accounts.maker.address(),
+        mint_to_raise: *accounts.mint_to_raise.address(),
         amount_to_raise,
-        0,  // current_amount starts at 0
-        0,  // time_started — would be Clock::get() onchain
+        current_amount: 0,
+        time_started: 0,
         duration,
         bump,
-    );
+    });
     Ok(())
 }

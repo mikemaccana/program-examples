@@ -1,5 +1,5 @@
 use {
-    crate::state::Escrow,
+    crate::state::{Escrow, EscrowInner},
     quasar_lang::prelude::*,
     quasar_spl::{Mint, Token, TokenCpi},
 };
@@ -25,14 +25,14 @@ pub struct Make {
 
 #[inline(always)]
 pub fn handle_make_escrow(accounts: &mut Make, receive: u64, bumps: &MakeBumps) -> Result<(), ProgramError> {
-    accounts.escrow.set_inner(
-        *accounts.maker.address(),
-        *accounts.mint_a.address(),
-        *accounts.mint_b.address(),
-        *accounts.maker_ta_b.address(),
+    accounts.escrow.set_inner(EscrowInner {
+        maker: *accounts.maker.address(),
+        mint_a: *accounts.mint_a.address(),
+        mint_b: *accounts.mint_b.address(),
+        maker_ta_b: *accounts.maker_ta_b.address(),
         receive,
-        bumps.escrow,
-    );
+        bump: bumps.escrow,
+    });
     Ok(())
 }
 

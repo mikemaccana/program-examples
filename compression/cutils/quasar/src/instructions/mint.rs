@@ -53,9 +53,8 @@ pub struct Mint {
     pub system_program: Program<System>,
 }
 
-pub fn handle_mint(accounts: &mut Mint, ctx: &Ctx<Mint>) -> Result<(), ProgramError> {
+pub fn handle_mint(accounts: &mut Mint, data: &[u8]) -> Result<(), ProgramError> {
     // Parse URI from instruction data: u32 length prefix + utf8 bytes (borsh String)
-    let data = ctx.data;
     if data.len() < 4 {
         return Err(ProgramError::InvalidInstructionData);
     }

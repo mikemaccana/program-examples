@@ -1,5 +1,5 @@
 use {
-    crate::state::PageVisits,
+    crate::state::{PageVisits, PageVisitsInner},
     quasar_lang::prelude::*,
 };
 
@@ -16,6 +16,6 @@ pub struct CreatePageVisits {
 
 #[inline(always)]
 pub fn handle_create_page_visits(accounts: &mut CreatePageVisits) -> Result<(), ProgramError> {
-    accounts.page_visits.set_inner(0u64);
+    accounts.page_visits.set_inner(PageVisitsInner { page_visits: 0 });
     Ok(())
 }

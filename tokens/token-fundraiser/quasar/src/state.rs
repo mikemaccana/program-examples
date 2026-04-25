@@ -14,7 +14,7 @@ pub struct Fundraiser {
 }
 
 /// Tracks how much a specific contributor has given.
-#[account(discriminator = 2)]
+#[account(discriminator = 2, set_inner)]
 pub struct Contributor {
     pub amount: u64,
 }

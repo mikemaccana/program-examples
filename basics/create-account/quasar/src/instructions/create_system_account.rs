@@ -1,4 +1,4 @@
-use quasar_lang::prelude::*;
+use quasar_lang::{prelude::*, sysvars::Sysvar};
 
 /// Accounts for creating a new system-owned account.
 /// Both payer and new_account must sign the transaction.
@@ -15,17 +15,11 @@ pub struct CreateSystemAccount {
 pub fn handle_create_system_account(
     accounts: &mut CreateSystemAccount,
 ) -> Result<(), ProgramError> {
-    // Create a zero-data account owned by the system program,
-    // funded with the minimum rent-exempt balance.
     let system_program_address = Address::default();
+    let rent = Rent::get()?;
+    let lamports = rent.minimum_balance_unchecked(0);
     accounts
         .system_program
-        .create_account_with_minimum_balance(
-            &accounts.payer,
-            &accounts.new_account,
-            0, // space: zero bytes of data
-            &system_program_address,
-            None, // fetch Rent sysvar automatically
-        )?
-        .invoke();
+        .create_account(&accounts.payer, &accounts.new_account, lamports, 0u64, &system_program_address)
+        .invoke()
 }

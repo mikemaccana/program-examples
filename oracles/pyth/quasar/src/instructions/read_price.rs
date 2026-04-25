@@ -27,42 +27,34 @@ pub struct ReadPrice {
 #[inline(always)]
 pub fn handle_read_price(accounts: &mut ReadPrice) -> Result<(), ProgramError> {
     let view = accounts.price_update.to_account_view();
-    let data = view.data();
+    let data = unsafe { core::slice::from_raw_parts(view.data_ptr(), view.data_len()) };
 
     if data.len() < MIN_DATA_LEN {
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let price = i64::from_le_bytes(
+    let _price = i64::from_le_bytes(
         data[PRICE_OFFSET..PRICE_OFFSET + 8]
             .try_into()
             .map_err(|_| ProgramError::InvalidAccountData)?,
     );
-    let conf = u64::from_le_bytes(
+    let _conf = u64::from_le_bytes(
         data[CONF_OFFSET..CONF_OFFSET + 8]
             .try_into()
             .map_err(|_| ProgramError::InvalidAccountData)?,
     );
-    let exponent = i32::from_le_bytes(
+    let _exponent = i32::from_le_bytes(
         data[EXPONENT_OFFSET..EXPONENT_OFFSET + 4]
             .try_into()
             .map_err(|_| ProgramError::InvalidAccountData)?,
     );
-    let publish_time = i64::from_le_bytes(
+    let _publish_time = i64::from_le_bytes(
         data[PUBLISH_TIME_OFFSET..PUBLISH_TIME_OFFSET + 8]
             .try_into()
             .map_err(|_| ProgramError::InvalidAccountData)?,
     );
 
-    log("Pyth price feed data:");
-    log("  price (raw):");
-    log_64(price as u64);
-    log("  confidence:");
-    log_64(conf);
-    log("  exponent:");
-    log_64(exponent as u64);
-    log("  publish_time:");
-    log_64(publish_time as u64);
+    log("Pyth price feed data read successfully.");
 
     Ok(())
 }

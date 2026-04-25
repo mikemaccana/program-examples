@@ -1,4 +1,4 @@
-use quasar_lang::prelude::*;
+use quasar_lang::{prelude::*, sysvars::Sysvar};
 
 /// Accounts for creating a new account funded by the rent vault PDA.
 /// The rent vault signs the create_account CPI via PDA seeds.
@@ -21,15 +21,10 @@ pub fn handle_create_new_account(accounts: &mut CreateNewAccount, rent_vault_bum
     ];
 
     let system_program_address = Address::default();
+    let rent = Rent::get()?;
+    let lamports = rent.minimum_balance_unchecked(0);
 
-    // Create a zero-data system-owned account, funded from the vault.
     accounts.system_program
-        .create_account_with_minimum_balance(
-            &accounts.rent_vault,
-            &accounts.new_account,
-            0, // space: zero bytes of data
-            &system_program_address,
-            None, // fetch Rent sysvar automatically
-        )?
+        .create_account(&accounts.rent_vault, &accounts.new_account, lamports, 0u64, &system_program_address)
         .invoke_signed(seeds)
 }

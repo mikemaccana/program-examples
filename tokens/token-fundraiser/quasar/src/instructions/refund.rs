@@ -1,5 +1,5 @@
 use {
-    crate::state::{Contributor, Fundraiser},
+    crate::state::{Contributor, ContributorInner, Fundraiser},
     quasar_lang::prelude::*,
     quasar_spl::{Token, TokenCpi},
 };
@@ -42,7 +42,7 @@ pub fn handle_refund(accounts: &mut Refund, bumps: &RefundBumps) -> Result<(), P
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
     // Zero out contributor amount
-    accounts.contributor_account.set_inner(0);
+    accounts.contributor_account.set_inner(ContributorInner { amount: 0 });
 
     Ok(())
 }
