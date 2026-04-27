@@ -75,7 +75,7 @@ pub fn handle_create_lease(
     lease_id: u64,
     leased_amount: u64,
     required_collateral_amount: u64,
-    rent_per_second: u64,
+    lease_fee_per_second: u64,
     duration_seconds: i64,
     maintenance_margin_bps: u16,
     liquidation_bounty_bps: u16,
@@ -83,7 +83,7 @@ pub fn handle_create_lease(
 ) -> Result<()> {
     // Reject leased_mint == collateral_mint. Allowing both to be the same
     // mint would collapse the two vaults' seed derivations into one shared
-    // token-balance pool, making rent-vs-collateral accounting ambiguous and
+    // token-balance pool, making lease-fee-vs-collateral accounting ambiguous and
     // enabling griefing paths where the lessee's "collateral" is the same
     // asset they already hold as the lease principal.
     require!(
@@ -96,7 +96,7 @@ pub fn handle_create_lease(
         required_collateral_amount > 0,
         AssetLeasingError::InvalidCollateralAmount
     );
-    require!(rent_per_second > 0, AssetLeasingError::InvalidRentPerSecond);
+    require!(lease_fee_per_second > 0, AssetLeasingError::InvalidLeaseFeePerSecond);
     require!(duration_seconds > 0, AssetLeasingError::InvalidDuration);
     require!(
         maintenance_margin_bps > 0 && maintenance_margin_bps <= MAX_MAINTENANCE_MARGIN_BPS,
@@ -131,13 +131,13 @@ pub fn handle_create_lease(
         // No collateral yet — posted on take_lease.
         collateral_amount: 0,
         required_collateral_amount,
-        rent_per_second,
+        lease_fee_per_second,
         duration_seconds,
-        // start_ts / end_ts / last_rent_paid_ts are set when the lease
+        // start_ts / end_ts / last_paid_ts are set when the lease
         // activates in `take_lease`.
         start_ts: 0,
         end_ts: 0,
-        last_rent_paid_ts: 0,
+        last_paid_ts: 0,
         maintenance_margin_bps,
         liquidation_bounty_bps,
         feed_id,

@@ -20,7 +20,7 @@ pub struct Lease {
     /// Caller-supplied id so one lessor can run many leases in parallel. The
     /// PDA is seeded by (LEASE_SEED, lessor, lease_id).
     pub lease_id: u64,
-    /// Account that listed the lease and receives rent. Always set.
+    /// Account that listed the lease and receives the lease fee. Always set.
     pub lessor: Pubkey,
     /// Account that took the lease. `Pubkey::default()` while `Listed`.
     pub lessee: Pubkey,
@@ -32,15 +32,15 @@ pub struct Lease {
 
     /// Mint of the collateral posted by the lessee.
     pub collateral_mint: Pubkey,
-    /// Collateral the lessee posted (increases on top-up). Decreases as rent
+    /// Collateral the lessee posted (increases on top-up). Decreases as the lease fee
     /// is streamed out of the collateral vault.
     pub collateral_amount: u64,
     /// Collateral the lessee must deposit up-front when taking the lease.
     pub required_collateral_amount: u64,
 
-    /// Rent charged per second, denominated in collateral tokens and paid
-    /// from the collateral vault to the lessor on each `pay_rent`.
-    pub rent_per_second: u64,
+    /// Lease fee charged per second, denominated in collateral tokens and paid
+    /// from the collateral vault to the lessor on each `pay_lease_fee`.
+    pub lease_fee_per_second: u64,
     /// Length of the lease, in seconds. Set at creation, used to compute
     /// `end_ts` when the lease activates.
     pub duration_seconds: i64,
@@ -48,8 +48,8 @@ pub struct Lease {
     pub start_ts: i64,
     /// Unix timestamp after which the lease expires. 0 while `Listed`.
     pub end_ts: i64,
-    /// Last time rent was settled. Rent accrues from here to `now.min(end_ts)`.
-    pub last_rent_paid_ts: i64,
+    /// Last time the lease fee was settled. Lease fee accrues from here to `now.min(end_ts)`.
+    pub last_paid_ts: i64,
 
     /// Required collateral value as a percentage of the leased value,
     /// expressed in basis points. 12_000 bps = 120%.

@@ -40,7 +40,7 @@ pub struct Lease {
     /// Caller-supplied id so one lessor can run many leases in parallel.
     pub lease_id: u64,
 
-    /// Signer of `create_lease`; paid rent and any final recovery.
+    /// Signer of `create_lease`; paid the lease fee and any final recovery.
     pub lessor: Address,
 
     /// Signer of `take_lease`. `Address::default()` while still `Listed`.
@@ -51,25 +51,25 @@ pub struct Lease {
     pub leased_amount: u64,
 
     pub collateral_mint: Address,
-    /// Decreases as rent streams out; increases on `top_up_collateral`.
+    /// Decreases as lease fee streams out; increases on `top_up_collateral`.
     pub collateral_amount: u64,
     /// What the lessee must post on `take_lease`.
     pub required_collateral_amount: u64,
 
     /// Denominated in collateral-mint base units per second.
-    pub rent_per_second: u64,
+    pub lease_fee_per_second: u64,
     pub duration_seconds: i64,
     /// `0` while `Listed`; `unix_timestamp` of `take_lease` while `Active`.
     pub start_ts: i64,
     /// `0` while `Listed`; `start_ts + duration_seconds` once `Active`.
     pub end_ts: i64,
-    /// Rent accrues from here to `min(now, end_ts)`.
-    pub last_rent_paid_ts: i64,
+    /// Lease fee accrues from here to `min(now, end_ts)`.
+    pub last_paid_ts: i64,
 
     /// Collateral-over-debt ratio in basis points.
     /// `12_000` bps = 120%. Capped at `MAX_MAINTENANCE_MARGIN_BPS`.
     pub maintenance_margin_bps: u16,
-    /// Keeper's cut of the post-rent collateral on liquidation, in basis
+    /// Keeper's cut of the post-lease-fee collateral on liquidation, in basis
     /// points. Capped at `MAX_LIQUIDATION_BOUNTY_BPS` to stop a malicious
     /// lessor from draining the recovery pool via the bounty.
     pub liquidation_bounty_bps: u16,

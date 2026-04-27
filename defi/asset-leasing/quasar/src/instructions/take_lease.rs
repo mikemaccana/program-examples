@@ -110,7 +110,7 @@ pub fn handle_take_lease(accounts: &mut TakeLease) -> Result<(), ProgramError> {
     lease.collateral_amount = required_collateral_amount.into();
     lease.start_ts = now.into();
     lease.end_ts = end_ts.into();
-    lease.last_rent_paid_ts = now.into();
+    lease.last_paid_ts = now.into();
     lease.status = LeaseStatus::Active as u8;
 
     Ok(())

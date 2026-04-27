@@ -12,9 +12,9 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct PayRent<'info> {
-    /// Anyone may settle rent — the lessee has every incentive to keep the
-    /// lease current, but a keeper bot could also push a payment before a
+pub struct PayLeaseFee<'info> {
+    /// Anyone may settle the lease fee — the lessee has every incentive to keep the
+    /// lease current, but a keeper bot could also push a lease fee payment before a
     /// liquidation check so healthy leases stay healthy.
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -45,7 +45,7 @@ pub struct PayRent<'info> {
     pub collateral_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Lessor's collateral-mint ATA, created on demand so the lessor does not
-    /// need to pre-fund it with rent.
+    /// need to pre-fund it with the lease fee.
     #[account(
         init_if_needed,
         payer = payer,
@@ -60,21 +60,21 @@ pub struct PayRent<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_pay_rent(context: Context<PayRent>) -> Result<()> {
+pub fn handle_pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
 
-    let rent_amount = compute_rent_due(&context.accounts.lease, now)?;
+    let lease_fee_amount = compute_lease_fee_due(&context.accounts.lease, now)?;
 
     // No time has passed (or already capped at end_ts). Nothing to do.
-    if rent_amount == 0 {
+    if lease_fee_amount == 0 {
         update_last_paid_ts(&mut context.accounts.lease, now);
         return Ok(());
     }
 
-    // Cap rent at whatever collateral actually sits in the vault. If the
+    // Cap lease fees at whatever collateral actually sits in the vault. If the
     // lessee under-collateralised we cannot magically create funds; the
     // remainder is their debt and can trigger liquidation.
-    let payable = rent_amount.min(context.accounts.collateral_amount_available());
+    let payable = lease_fee_amount.min(context.accounts.collateral_amount_available());
 
     if payable > 0 {
         let lease_key = context.accounts.lease.key();
@@ -108,27 +108,27 @@ pub fn handle_pay_rent(context: Context<PayRent>) -> Result<()> {
     Ok(())
 }
 
-/// Rent accrues linearly: `(min(now, end_ts) - last_rent_paid_ts) * rate`.
+/// Lease fee accrues linearly: `(min(now, end_ts) - last_paid_ts) * rate`.
 /// Extracted so it can be re-used by `return_lease` and `liquidate` for a
 /// final settlement before closing the lease.
-pub fn compute_rent_due(lease: &Lease, now: i64) -> Result<u64> {
+pub fn compute_lease_fee_due(lease: &Lease, now: i64) -> Result<u64> {
     let cutoff = now.min(lease.end_ts);
-    if cutoff <= lease.last_rent_paid_ts {
+    if cutoff <= lease.last_paid_ts {
         return Ok(0);
     }
-    let elapsed = (cutoff - lease.last_rent_paid_ts) as u64;
+    let elapsed = (cutoff - lease.last_paid_ts) as u64;
     elapsed
-        .checked_mul(lease.rent_per_second)
+        .checked_mul(lease.lease_fee_per_second)
         .ok_or(AssetLeasingError::MathOverflow.into())
 }
 
-/// Advance `last_rent_paid_ts` but never past the lease end — after end_ts
-/// the lease is settled and extra rent does not accrue.
+/// Advance `last_paid_ts` but never past the lease end — after end_ts
+/// the lease is settled and extra Lease fees do not accrue.
 pub fn update_last_paid_ts(lease: &mut Lease, now: i64) {
-    lease.last_rent_paid_ts = now.min(lease.end_ts);
+    lease.last_paid_ts = now.min(lease.end_ts);
 }
 
-impl<'info> PayRent<'info> {
+impl<'info> PayLeaseFee<'info> {
     fn collateral_amount_available(&self) -> u64 {
         self.lease.collateral_amount
     }

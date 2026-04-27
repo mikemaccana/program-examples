@@ -2,7 +2,7 @@ use {
     crate::{
         constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
         errors::AssetLeasingError,
-        instructions::pay_rent::update_last_paid_ts,
+        instructions::pay_lease_fee::update_last_paid_ts,
         state::{Lease, LeaseStatus},
     },
     quasar_lang::prelude::*,
@@ -140,11 +140,11 @@ pub fn handle_close_expired(accounts: &mut CloseExpired) -> Result<(), ProgramEr
         )
         .invoke_signed(collateral_vault_seeds)?;
 
-    // Keep the rent-settlement invariant intact even on default: the
+    // Keep the lease-fee-settlement invariant intact even on default: the
     // lessor takes the whole collateral vault as compensation here, but
     // any future version of the program that wants to split the
-    // collateral differently (pro-rata rent, partial refund on default)
-    // can read `last_rent_paid_ts` and trust that everything up to
+    // collateral differently (pro-rata lease fees, partial refund on default)
+    // can read `last_paid_ts` and trust that everything up to
     // `now` is already settled.
     if status == LeaseStatus::Active {
         update_last_paid_ts(accounts.lease, now);

@@ -23,7 +23,7 @@ pub mod asset_leasing {
         lease_id: u64,
         leased_amount: u64,
         required_collateral_amount: u64,
-        rent_per_second: u64,
+        lease_fee_per_second: u64,
         duration_seconds: i64,
         maintenance_margin_bps: u16,
         liquidation_bounty_bps: u16,
@@ -34,7 +34,7 @@ pub mod asset_leasing {
             lease_id,
             leased_amount,
             required_collateral_amount,
-            rent_per_second,
+            lease_fee_per_second,
             duration_seconds,
             maintenance_margin_bps,
             liquidation_bounty_bps,
@@ -48,10 +48,10 @@ pub mod asset_leasing {
         instructions::take_lease::handle_take_lease(context)
     }
 
-    /// Stream rent from the collateral vault to the lessor, up to `end_ts`.
+    /// Stream the lease fee from the collateral vault to the lessor, up to `end_ts`.
     /// Anyone may call this to keep the lease current.
-    pub fn pay_rent(context: Context<PayRent>) -> Result<()> {
-        instructions::pay_rent::handle_pay_rent(context)
+    pub fn pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
+        instructions::pay_lease_fee::handle_pay_lease_fee(context)
     }
 
     /// Lessee adds more collateral to stay above the maintenance margin.
@@ -59,7 +59,7 @@ pub mod asset_leasing {
         instructions::top_up_collateral::handle_top_up_collateral(context, amount)
     }
 
-    /// Lessee returns the leased tokens (at or before `end_ts`). Accrued rent
+    /// Lessee returns the leased tokens (at or before `end_ts`). Accrued lease fees
     /// is settled and the remaining collateral is refunded.
     pub fn return_lease(context: Context<ReturnLease>) -> Result<()> {
         instructions::return_lease::handle_return_lease(context)

@@ -77,7 +77,7 @@ pub fn handle_create_lease(
     lease_id: u64,
     leased_amount: u64,
     required_collateral_amount: u64,
-    rent_per_second: u64,
+    lease_fee_per_second: u64,
     duration_seconds: i64,
     maintenance_margin_bps: u16,
     liquidation_bounty_bps: u16,
@@ -85,7 +85,7 @@ pub fn handle_create_lease(
     bumps: &CreateLeaseBumps,
 ) -> Result<(), ProgramError> {
     // Two vaults keyed on the same mint would collide on the shared
-    // token-balance pool and make rent-vs-collateral accounting
+    // token-balance pool and make lease-fee-vs-collateral accounting
     // ambiguous. Reject up-front.
     require!(
         accounts.leased_mint.address() != accounts.collateral_mint.address(),
@@ -98,8 +98,8 @@ pub fn handle_create_lease(
         AssetLeasingError::InvalidCollateralAmount
     );
     require!(
-        rent_per_second > 0,
-        AssetLeasingError::InvalidRentPerSecond
+        lease_fee_per_second > 0,
+        AssetLeasingError::InvalidLeaseFeePerSecond
     );
     require!(duration_seconds > 0, AssetLeasingError::InvalidDuration);
     require!(
@@ -136,9 +136,9 @@ pub fn handle_create_lease(
         // No collateral yet — posted on `take_lease`.
         0,
         required_collateral_amount,
-        rent_per_second,
+        lease_fee_per_second,
         duration_seconds,
-        // start_ts / end_ts / last_rent_paid_ts set on `take_lease`.
+        // start_ts / end_ts / last_paid_ts set on `take_lease`.
         0,
         0,
         0,

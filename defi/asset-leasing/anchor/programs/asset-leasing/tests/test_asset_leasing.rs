@@ -1,6 +1,6 @@
 //! LiteSVM tests for the asset-leasing program.
 //!
-//! Covers the full lifecycle: listing, taking, rent streaming, top-ups,
+//! Covers the full lifecycle: listing, taking, lease fee streaming, top-ups,
 //! early return, keeper liquidation via a mocked Pyth `PriceUpdateV2`
 //! account, and lessor-initiated default recovery after expiry.
 
@@ -124,7 +124,7 @@ fn full_setup() -> Scenario {
 
     // Anchor macros init the Lease + vault accounts — LiteSVM's default clock
     // is epoch 0 which makes the first `take_lease` have start_ts=0 and look
-    // identical to a Listed lease. Advance once so rent math has signal.
+    // identical to a Listed lease. Advance once so lease fee math has signal.
     advance_clock_to(&mut svm, 1_700_000_000);
 
     Scenario {
@@ -167,7 +167,7 @@ fn build_create_lease_ix(
     lease_id: u64,
     leased_amount: u64,
     required_collateral_amount: u64,
-    rent_per_second: u64,
+    lease_fee_per_second: u64,
     duration_seconds: i64,
     maintenance_margin_bps: u16,
     liquidation_bounty_bps: u16,
@@ -181,7 +181,7 @@ fn build_create_lease_ix(
             lease_id,
             leased_amount,
             required_collateral_amount,
-            rent_per_second,
+            lease_fee_per_second,
             duration_seconds,
             maintenance_margin_bps,
             liquidation_bounty_bps,
@@ -228,14 +228,14 @@ fn build_take_lease_ix(sc: &Scenario, lease_id: u64) -> Instruction {
     )
 }
 
-fn build_pay_rent_ix(sc: &Scenario, lease_id: u64) -> Instruction {
+fn build_pay_lease_fee_ix(sc: &Scenario, lease_id: u64) -> Instruction {
     let (lease, _leased_vault, collateral_vault) =
         lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
     let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
     Instruction::new_with_bytes(
         sc.program_id,
-        &asset_leasing::instruction::PayRent {}.data(),
-        asset_leasing::accounts::PayRent {
+        &asset_leasing::instruction::PayLeaseFee {}.data(),
+        asset_leasing::accounts::PayLeaseFee {
             payer: sc.lessee.pubkey(),
             lessor: sc.lessor.pubkey(),
             lease,
@@ -412,7 +412,7 @@ fn mock_price_update(
 // Shared lease parameters so the sanity assertions line up across tests.
 const LEASED_AMOUNT: u64 = 100_000_000; // 100 "leased" tokens (6 dp)
 const REQUIRED_COLLATERAL: u64 = 200_000_000; // 200 collateral tokens
-const RENT_PER_SECOND: u64 = 10; // 10 base-units / sec
+const LEASE_FEE_PER_SECOND: u64 = 10; // 10 base-units / sec
 const DURATION_SECONDS: i64 = 60 * 60 * 24; // 24h
 const MAINTENANCE_MARGIN_BPS: u16 = 12_000; // 120%
 const LIQUIDATION_BOUNTY_BPS: u16 = 500; // 5%
@@ -432,7 +432,7 @@ fn create_lease_locks_tokens_and_lists() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -476,7 +476,7 @@ fn take_lease_posts_collateral_and_delivers_tokens() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -521,7 +521,7 @@ fn take_lease_posts_collateral_and_delivers_tokens() {
 }
 
 #[test]
-fn pay_rent_streams_collateral_by_elapsed_time() {
+fn pay_lease_fee_streams_collateral_by_elapsed_time() {
     let mut sc = full_setup();
     let lease_id = 3u64;
 
@@ -530,7 +530,7 @@ fn pay_rent_streams_collateral_by_elapsed_time() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -548,7 +548,7 @@ fn pay_rent_streams_collateral_by_elapsed_time() {
     let elapsed: i64 = 120; // 2 minutes
     advance_clock_by(&mut sc.svm, elapsed);
 
-    let pay_ix = build_pay_rent_ix(&sc, lease_id);
+    let pay_ix = build_pay_lease_fee_ix(&sc, lease_id);
     send_transaction_from_instructions(
         &mut sc.svm,
         vec![pay_ix],
@@ -557,16 +557,16 @@ fn pay_rent_streams_collateral_by_elapsed_time() {
     )
     .unwrap();
 
-    let expected_rent = (elapsed as u64) * RENT_PER_SECOND;
+    let expected_lease_fees = (elapsed as u64) * LEASE_FEE_PER_SECOND;
     let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
     assert_eq!(
         get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
-        expected_rent
+        expected_lease_fees
     );
     let (_, _, collateral_vault) = lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
     assert_eq!(
         get_token_account_balance(&sc.svm, &collateral_vault).unwrap(),
-        REQUIRED_COLLATERAL - expected_rent
+        REQUIRED_COLLATERAL - expected_lease_fees
     );
 }
 
@@ -580,7 +580,7 @@ fn top_up_collateral_increases_vault_balance() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -622,7 +622,7 @@ fn return_lease_refunds_unused_collateral() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -650,19 +650,19 @@ fn return_lease_refunds_unused_collateral() {
     )
     .unwrap();
 
-    let rent_paid = (elapsed as u64) * RENT_PER_SECOND;
-    let refund_expected = REQUIRED_COLLATERAL - rent_paid;
+    let lease_fee_paid = (elapsed as u64) * LEASE_FEE_PER_SECOND;
+    let refund_expected = REQUIRED_COLLATERAL - lease_fee_paid;
 
     // Lessor got their leased tokens back.
     assert_eq!(
         get_token_account_balance(&sc.svm, &sc.lessor_leased_ata).unwrap(),
         1_000_000_000
     );
-    // Lessor also received the accrued rent.
+    // Lessor also received the accrued lease fees.
     let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
     assert_eq!(
         get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
-        rent_paid
+        lease_fee_paid
     );
     // Lessee got the unused-time portion of their collateral back.
     assert_eq!(
@@ -688,7 +688,7 @@ fn liquidate_seizes_collateral_on_price_drop() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -703,8 +703,8 @@ fn liquidate_seizes_collateral_on_price_drop() {
     )
     .unwrap();
 
-    // A bit of rent accrues before the liquidation call so the handler has to
-    // settle rent *and* bounty on the same vault balance.
+    // A bit of Lease fee accrues before the liquidation call so the handler has to
+    // settle the lease fee *and* bounty on the same vault balance.
     let elapsed: i64 = 300;
     advance_clock_by(&mut sc.svm, elapsed);
 
@@ -731,17 +731,17 @@ fn liquidate_seizes_collateral_on_price_drop() {
     )
     .unwrap();
 
-    let rent_paid = (elapsed as u64) * RENT_PER_SECOND;
-    let remaining_after_rent = REQUIRED_COLLATERAL - rent_paid;
-    let bounty = remaining_after_rent * (LIQUIDATION_BOUNTY_BPS as u64) / 10_000;
-    let lessor_share = remaining_after_rent - bounty;
+    let lease_fee_paid = (elapsed as u64) * LEASE_FEE_PER_SECOND;
+    let remaining_after_lease_fees = REQUIRED_COLLATERAL - lease_fee_paid;
+    let bounty = remaining_after_lease_fees * (LIQUIDATION_BOUNTY_BPS as u64) / 10_000;
+    let lessor_share = remaining_after_lease_fees - bounty;
 
     let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
     let keeper_collateral_ata = derive_ata(&sc.keeper.pubkey(), &sc.collateral_mint);
 
     assert_eq!(
         get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
-        rent_paid + lessor_share
+        lease_fee_paid + lessor_share
     );
     assert_eq!(
         get_token_account_balance(&sc.svm, &keeper_collateral_ata).unwrap(),
@@ -766,7 +766,7 @@ fn liquidate_rejects_healthy_position() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -812,7 +812,7 @@ fn liquidate_rejects_mismatched_price_feed() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -870,7 +870,7 @@ fn close_expired_reclaims_collateral_after_end_ts() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -927,7 +927,7 @@ fn close_expired_cancels_listed_lease() {
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
-        RENT_PER_SECOND,
+        LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
@@ -967,7 +967,7 @@ fn close_expired_cancels_listed_lease() {
 fn create_lease_rejects_same_mint_for_leased_and_collateral() {
     // Collapsing leased_mint and collateral_mint into a single mint would
     // also collapse the two vaults into one token-balance pool (same mint,
-    // same authority seed pattern) and make rent-vs-collateral accounting
+    // same authority seed pattern) and make lease-fee-vs-collateral accounting
     // ambiguous. The program rejects this up-front with
     // `LeasedMintEqualsCollateralMint`.
     let mut sc = full_setup();
@@ -984,7 +984,7 @@ fn create_lease_rejects_same_mint_for_leased_and_collateral() {
             lease_id,
             leased_amount: LEASED_AMOUNT,
             required_collateral_amount: REQUIRED_COLLATERAL,
-            rent_per_second: RENT_PER_SECOND,
+            lease_fee_per_second: LEASE_FEE_PER_SECOND,
             duration_seconds: DURATION_SECONDS,
             maintenance_margin_bps: MAINTENANCE_MARGIN_BPS,
             liquidation_bounty_bps: LIQUIDATION_BOUNTY_BPS,

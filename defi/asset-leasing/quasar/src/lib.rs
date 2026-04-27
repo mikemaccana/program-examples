@@ -16,7 +16,7 @@ mod tests;
 // interchangeably.
 declare_id!("Lease11111111111111111111111111111111111111");
 
-/// Asset-leasing program: fixed-term token leases with a streaming rent
+/// Asset-leasing program: fixed-term token leases with a streaming lease fee
 /// payment, collateral escrow, and Pyth-oracle-triggered liquidation.
 ///
 /// See the top-level `defi/asset-leasing/anchor/README.md` for the full
@@ -34,7 +34,7 @@ mod quasar_asset_leasing {
         lease_id: u64,
         leased_amount: u64,
         required_collateral_amount: u64,
-        rent_per_second: u64,
+        lease_fee_per_second: u64,
         duration_seconds: i64,
         maintenance_margin_bps: u16,
         liquidation_bounty_bps: u16,
@@ -45,7 +45,7 @@ mod quasar_asset_leasing {
             lease_id,
             leased_amount,
             required_collateral_amount,
-            rent_per_second,
+            lease_fee_per_second,
             duration_seconds,
             maintenance_margin_bps,
             liquidation_bounty_bps,
@@ -60,8 +60,8 @@ mod quasar_asset_leasing {
     }
 
     #[instruction(discriminator = 2)]
-    pub fn pay_rent(ctx: Ctx<PayRent>) -> Result<(), ProgramError> {
-        instructions::handle_pay_rent(&mut ctx.accounts)
+    pub fn pay_lease_fee(ctx: Ctx<PayLeaseFee>) -> Result<(), ProgramError> {
+        instructions::handle_pay_lease_fee(&mut ctx.accounts)
     }
 
     #[instruction(discriminator = 3)]

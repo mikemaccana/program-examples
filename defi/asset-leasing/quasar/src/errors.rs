@@ -10,7 +10,7 @@ pub enum AssetLeasingError {
     InvalidDuration,
     InvalidLeasedAmount,
     InvalidCollateralAmount,
-    InvalidRentPerSecond,
+    InvalidLeaseFeePerSecond,
     InvalidMaintenanceMargin,
     InvalidLiquidationBounty,
     LeaseExpired,

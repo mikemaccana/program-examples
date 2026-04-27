@@ -11,7 +11,7 @@ use crate::{
     },
     errors::AssetLeasingError,
     instructions::{
-        pay_rent::compute_rent_due,
+        pay_lease_fee::compute_lease_fee_due,
         shared::{close_vault, transfer_tokens_from_vault},
     },
     state::{Lease, LeaseStatus},
@@ -34,7 +34,7 @@ pub struct Liquidate<'info> {
     #[account(mut)]
     pub keeper: Signer<'info>,
 
-    /// CHECK: PDA seed + rent/collateral destination.
+    /// CHECK: PDA seed + lease-fee / collateral destination.
     #[account(mut)]
     pub lessor: UncheckedAccount<'info>,
 
@@ -174,10 +174,10 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         AssetLeasingError::PositionHealthy
     );
 
-    // Settle accrued rent first (up to end_ts) so the lessor is paid for the
+    // Settle accrued lease fees first (up to end_ts) so the lessor is paid for the
     // time the lessee actually used. Only then slice off bounty + remainder.
-    let rent_due = compute_rent_due(&context.accounts.lease, now)?;
-    let rent_payable = rent_due.min(context.accounts.lease.collateral_amount);
+    let lease_fee_due = compute_lease_fee_due(&context.accounts.lease, now)?;
+    let lease_fee_payable = lease_fee_due.min(context.accounts.lease.collateral_amount);
 
     let lease_key = context.accounts.lease.key();
     let collateral_vault_bump = context.accounts.lease.collateral_vault_bump;
@@ -193,11 +193,11 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         core::slice::from_ref(&leased_vault_bump),
     ];
 
-    if rent_payable > 0 {
+    if lease_fee_payable > 0 {
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
             &context.accounts.lessor_collateral_account,
-            rent_payable,
+            lease_fee_payable,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),
             &context.accounts.token_program,
@@ -209,10 +209,10 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         .accounts
         .lease
         .collateral_amount
-        .checked_sub(rent_payable)
+        .checked_sub(lease_fee_payable)
         .ok_or(AssetLeasingError::MathOverflow)?;
 
-    // Bounty is a percentage of the collateral *after* rent — guarantees we
+    // Bounty is a percentage of the collateral *after* lease fees — guarantees we
     // never try to pay out more than what actually sits in the vault.
     let bounty = (remaining as u128)
         .checked_mul(context.accounts.lease.liquidation_bounty_bps as u128)
@@ -264,7 +264,7 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     )?;
 
     context.accounts.lease.collateral_amount = 0;
-    context.accounts.lease.last_rent_paid_ts = now.min(context.accounts.lease.end_ts);
+    context.accounts.lease.last_paid_ts = now.min(context.accounts.lease.end_ts);
     context.accounts.lease.status = LeaseStatus::Liquidated;
 
     Ok(())

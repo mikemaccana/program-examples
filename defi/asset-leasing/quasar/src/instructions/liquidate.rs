@@ -5,7 +5,7 @@ use {
             PYTH_MAX_AGE_SECONDS,
         },
         errors::AssetLeasingError,
-        instructions::pay_rent::compute_rent_due,
+        instructions::pay_lease_fee::compute_lease_fee_due,
         state::{Lease, LeaseStatus},
     },
     quasar_lang::prelude::*,
@@ -32,7 +32,7 @@ pub struct Liquidate<'info> {
     #[account(mut)]
     pub keeper: &'info Signer,
 
-    /// Receives rent + the post-bounty remainder. Also the destination
+    /// Receives the lease fee + the post-bounty remainder. Also the destination
     /// for the closed-vault rent-exempt lamports.
     #[account(mut)]
     pub lessor: &'info UncheckedAccount,
@@ -162,12 +162,12 @@ pub fn handle_liquidate(accounts: &mut Liquidate) -> Result<(), ProgramError> {
         return Err(AssetLeasingError::PositionHealthy.into());
     }
 
-    // Settle accrued rent first (up to end_ts) so the lessor is paid for
+    // Settle accrued lease fees first (up to end_ts) so the lessor is paid for
     // the time the lessee actually used. Only then slice off bounty +
     // remainder.
-    let rent_due = compute_rent_due(accounts.lease, now)?;
+    let lease_fee_due = compute_lease_fee_due(accounts.lease, now)?;
     let collateral_amount = accounts.lease.collateral_amount.get();
-    let rent_payable = rent_due.min(collateral_amount);
+    let lease_fee_payable = lease_fee_due.min(collateral_amount);
 
     let lease_address = *accounts.lease.address();
     let collateral_vault_bump = [accounts.lease.collateral_vault_bump];
@@ -183,23 +183,23 @@ pub fn handle_liquidate(accounts: &mut Liquidate) -> Result<(), ProgramError> {
         Seed::from(&leased_vault_bump as &[u8]),
     ];
 
-    if rent_payable > 0 {
+    if lease_fee_payable > 0 {
         accounts
             .token_program
             .transfer(
                 accounts.collateral_vault,
                 accounts.lessor_collateral_account,
                 accounts.collateral_vault,
-                rent_payable,
+                lease_fee_payable,
             )
             .invoke_signed(collateral_vault_seeds)?;
     }
 
     let remaining = collateral_amount
-        .checked_sub(rent_payable)
+        .checked_sub(lease_fee_payable)
         .ok_or(AssetLeasingError::MathOverflow)?;
 
-    // Bounty is a percentage of the collateral *after* rent — guarantees
+    // Bounty is a percentage of the collateral *after* lease fees — guarantees
     // we never try to pay out more than what actually sits in the vault.
     let bounty = (remaining as u128)
         .checked_mul(accounts.lease.liquidation_bounty_bps.get() as u128)
@@ -256,7 +256,7 @@ pub fn handle_liquidate(accounts: &mut Liquidate) -> Result<(), ProgramError> {
 
     accounts.lease.collateral_amount = 0u64.into();
     let end_ts = accounts.lease.end_ts.get();
-    accounts.lease.last_rent_paid_ts = now.min(end_ts).into();
+    accounts.lease.last_paid_ts = now.min(end_ts).into();
     accounts.lease.status = LeaseStatus::Liquidated as u8;
 
     Ok(())

@@ -127,7 +127,7 @@ pub fn handle_take_lease(context: Context<TakeLease>) -> Result<()> {
     lease.collateral_amount = required_collateral_amount;
     lease.start_ts = now;
     lease.end_ts = end_ts;
-    lease.last_rent_paid_ts = now;
+    lease.last_paid_ts = now;
     lease.status = LeaseStatus::Active;
 
     Ok(())

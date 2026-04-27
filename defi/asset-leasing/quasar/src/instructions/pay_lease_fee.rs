@@ -8,11 +8,11 @@ use {
     quasar_spl::{Mint, Token, TokenCpi},
 };
 
-/// Accounts for settling rent on an `Active` lease. Permissionless: the
+/// Accounts for settling the lease fee on an `Active` lease. Permissionless: the
 /// lessee has every incentive to keep the lease current, but a keeper bot
-/// could also push a payment before a liquidation check.
+/// could also push a lease fee payment before a liquidation check.
 #[derive(Accounts)]
-pub struct PayRent<'info> {
+pub struct PayLeaseFee<'info> {
     #[account(mut)]
     pub payer: &'info Signer,
 
@@ -47,21 +47,21 @@ pub struct PayRent<'info> {
 }
 
 #[inline(always)]
-pub fn handle_pay_rent(accounts: &mut PayRent) -> Result<(), ProgramError> {
+pub fn handle_pay_lease_fee(accounts: &mut PayLeaseFee) -> Result<(), ProgramError> {
     let now = <Clock as quasar_lang::sysvars::Sysvar>::get()?.unix_timestamp.get();
 
-    let rent_amount = compute_rent_due(accounts.lease, now)?;
+    let lease_fee_amount = compute_lease_fee_due(accounts.lease, now)?;
 
-    if rent_amount == 0 {
+    if lease_fee_amount == 0 {
         update_last_paid_ts(accounts.lease, now);
         return Ok(());
     }
 
-    // Cap rent at whatever collateral actually sits in the vault. If the
+    // Cap lease fees at whatever collateral actually sits in the vault. If the
     // lessee under-collateralised we cannot magically create funds; the
     // remainder is their debt and can trigger liquidation.
     let collateral_amount = accounts.lease.collateral_amount.get();
-    let payable = rent_amount.min(collateral_amount);
+    let payable = lease_fee_amount.min(collateral_amount);
 
     if payable > 0 {
         let lease_address = *accounts.lease.address();
@@ -91,25 +91,25 @@ pub fn handle_pay_rent(accounts: &mut PayRent) -> Result<(), ProgramError> {
     Ok(())
 }
 
-/// Rent accrues linearly: `(min(now, end_ts) - last_rent_paid_ts) * rate`.
+/// Lease fee accrues linearly: `(min(now, end_ts) - last_paid_ts) * rate`.
 /// Shared with `return_lease` and `liquidate` for final settlement.
-pub fn compute_rent_due(lease: &Lease, now: i64) -> Result<u64, ProgramError> {
+pub fn compute_lease_fee_due(lease: &Lease, now: i64) -> Result<u64, ProgramError> {
     let end_ts = lease.end_ts.get();
-    let last_paid = lease.last_rent_paid_ts.get();
+    let last_paid = lease.last_paid_ts.get();
     let cutoff = now.min(end_ts);
     if cutoff <= last_paid {
         return Ok(0);
     }
     let elapsed = (cutoff - last_paid) as u64;
     elapsed
-        .checked_mul(lease.rent_per_second.get())
+        .checked_mul(lease.lease_fee_per_second.get())
         .ok_or_else(|| AssetLeasingError::MathOverflow.into())
 }
 
-/// Advance `last_rent_paid_ts`, but never past `end_ts` — once the lease
-/// is over, extra rent does not accrue.
+/// Advance `last_paid_ts`, but never past `end_ts` — once the lease
+/// is over, extra Lease fees do not accrue.
 pub fn update_last_paid_ts(lease: &mut Lease, now: i64) {
     let end_ts = lease.end_ts.get();
     let capped = now.min(end_ts);
-    lease.last_rent_paid_ts = capped.into();
+    lease.last_paid_ts = capped.into();
 }

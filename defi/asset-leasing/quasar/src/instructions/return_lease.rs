@@ -2,7 +2,7 @@ use {
     crate::{
         constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
         errors::AssetLeasingError,
-        instructions::pay_rent::{compute_rent_due, update_last_paid_ts},
+        instructions::pay_lease_fee::{compute_lease_fee_due, update_last_paid_ts},
         state::{Lease, LeaseStatus},
     },
     quasar_lang::prelude::*,
@@ -10,7 +10,7 @@ use {
 };
 
 /// Accounts for the happy-path return. Lessee hands the leased tokens
-/// back, pays accrued rent out of their collateral, and receives whatever
+/// back, pays accrued lease fees out of their collateral, and receives whatever
 /// collateral is left. Both vaults are closed so the lessor recoups the
 /// rent-exempt lamports.
 #[derive(Accounts)]
@@ -18,7 +18,7 @@ pub struct ReturnLease<'info> {
     #[account(mut)]
     pub lessee: &'info Signer,
 
-    /// Receives the leased tokens + any accrued rent + the vaults'
+    /// Receives the leased tokens + any accrued lease fees + the vaults'
     /// rent-exempt lamports.
     #[account(mut)]
     pub lessor: &'info UncheckedAccount,
@@ -105,10 +105,10 @@ pub fn handle_return_lease(accounts: &mut ReturnLease) -> Result<(), ProgramErro
         )
         .invoke_signed(leased_vault_seeds)?;
 
-    // 3. Settle accrued rent: collateral vault -> lessor.
-    let rent_due = compute_rent_due(accounts.lease, now)?;
+    // 3. Settle accrued lease fees: collateral vault -> lessor.
+    let lease_fee_due = compute_lease_fee_due(accounts.lease, now)?;
     let collateral_amount = accounts.lease.collateral_amount.get();
-    let rent_payable = rent_due.min(collateral_amount);
+    let lease_fee_payable = lease_fee_due.min(collateral_amount);
 
     let collateral_vault_bump = [accounts.lease.collateral_vault_bump];
     let collateral_vault_seeds: &[Seed] = &[
@@ -117,34 +117,34 @@ pub fn handle_return_lease(accounts: &mut ReturnLease) -> Result<(), ProgramErro
         Seed::from(&collateral_vault_bump as &[u8]),
     ];
 
-    if rent_payable > 0 {
+    if lease_fee_payable > 0 {
         accounts
             .token_program
             .transfer(
                 accounts.collateral_vault,
                 accounts.lessor_collateral_account,
                 accounts.collateral_vault,
-                rent_payable,
+                lease_fee_payable,
             )
             .invoke_signed(collateral_vault_seeds)?;
     }
 
     // 4. Refund remaining collateral to the lessee. Returning early does
-    // not entitle the lessee to a future-rent refund — rent only accrues
-    // for time actually used, so `compute_rent_due` already excludes the
+    // not entitle the lessee to a future-lease-fee refund — Lease fees only accrue
+    // for time actually used, so `compute_lease_fee_due` already excludes the
     // unused tail.
-    let collateral_after_rent = collateral_amount
-        .checked_sub(rent_payable)
+    let collateral_after_lease_fees = collateral_amount
+        .checked_sub(lease_fee_payable)
         .ok_or(AssetLeasingError::MathOverflow)?;
 
-    if collateral_after_rent > 0 {
+    if collateral_after_lease_fees > 0 {
         accounts
             .token_program
             .transfer(
                 accounts.collateral_vault,
                 accounts.lessee_collateral_account,
                 accounts.collateral_vault,
-                collateral_after_rent,
+                collateral_after_lease_fees,
             )
             .invoke_signed(collateral_vault_seeds)?;
     }

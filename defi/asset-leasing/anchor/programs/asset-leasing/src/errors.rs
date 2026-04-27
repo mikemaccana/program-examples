@@ -10,8 +10,8 @@ pub enum AssetLeasingError {
     InvalidLeasedAmount,
     #[msg("Required collateral amount must be greater than zero")]
     InvalidCollateralAmount,
-    #[msg("Rent per second must be greater than zero")]
-    InvalidRentPerSecond,
+    #[msg("Lease fee per second must be greater than zero")]
+    InvalidLeaseFeePerSecond,
     #[msg("Maintenance margin is outside the allowed range")]
     InvalidMaintenanceMargin,
     #[msg("Liquidation bounty is outside the allowed range")]
