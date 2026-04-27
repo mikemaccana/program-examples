@@ -25,8 +25,8 @@ pub mod asset_leasing {
         required_collateral_amount: u64,
         lease_fee_per_second: u64,
         duration_seconds: i64,
-        maintenance_margin_bps: u16,
-        liquidation_bounty_bps: u16,
+        maintenance_margin_basis_points: u16,
+        liquidation_bounty_basis_points: u16,
         feed_id: [u8; 32],
     ) -> Result<()> {
         instructions::create_lease::handle_create_lease(
@@ -36,8 +36,8 @@ pub mod asset_leasing {
             required_collateral_amount,
             lease_fee_per_second,
             duration_seconds,
-            maintenance_margin_bps,
-            liquidation_bounty_bps,
+            maintenance_margin_basis_points,
+            liquidation_bounty_basis_points,
             feed_id,
         )
     }
@@ -48,7 +48,7 @@ pub mod asset_leasing {
         instructions::take_lease::handle_take_lease(context)
     }
 
-    /// Stream the lease fee from the collateral vault to the lessor, up to `end_ts`.
+    /// Stream the lease fee from the collateral vault to the lessor, up to `end_timestamp`.
     /// Anyone may call this to keep the lease current.
     pub fn pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
         instructions::pay_lease_fee::handle_pay_lease_fee(context)
@@ -59,7 +59,7 @@ pub mod asset_leasing {
         instructions::top_up_collateral::handle_top_up_collateral(context, amount)
     }
 
-    /// Lessee returns the leased tokens (at or before `end_ts`). Accrued lease fees
+    /// Lessee returns the leased tokens (at or before `end_timestamp`). Accrued lease fees
     /// is settled and the remaining collateral is refunded.
     pub fn return_lease(context: Context<ReturnLease>) -> Result<()> {
         instructions::return_lease::handle_return_lease(context)
@@ -71,7 +71,7 @@ pub mod asset_leasing {
         instructions::liquidate::handle_liquidate(context)
     }
 
-    /// After `end_ts`, if the lessee never returned the tokens, the lessor
+    /// After `end_timestamp`, if the lessee never returned the tokens, the lessor
     /// reclaims the collateral as compensation and closes the lease. Also
     /// used by the lessor to cancel an unrented (`Listed`) lease.
     pub fn close_expired(context: Context<CloseExpired>) -> Result<()> {

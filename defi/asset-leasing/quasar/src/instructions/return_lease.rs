@@ -2,7 +2,7 @@ use {
     crate::{
         constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
         errors::AssetLeasingError,
-        instructions::pay_lease_fee::{compute_lease_fee_due, update_last_paid_ts},
+        instructions::pay_lease_fee::{compute_lease_fee_due, update_last_paid_timestamp},
         state::{Lease, LeaseStatus},
     },
     quasar_lang::prelude::*,
@@ -169,7 +169,7 @@ pub fn handle_return_lease(accounts: &mut ReturnLease) -> Result<(), ProgramErro
         )
         .invoke_signed(collateral_vault_seeds)?;
 
-    update_last_paid_ts(accounts.lease, now);
+    update_last_paid_timestamp(accounts.lease, now);
     accounts.lease.collateral_amount = 0u64.into();
     accounts.lease.status = LeaseStatus::Closed as u8;
 

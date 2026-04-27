@@ -16,7 +16,7 @@ pub struct TakeLease<'info> {
     #[account(mut)]
     pub lessee: Signer<'info>,
 
-    /// CHECK: Only used as a reference for the PDA seeds; no data accessed.
+    /// CHECK: Only used as a reference for the program-derived address seeds; no data accessed.
     pub lessor: UncheckedAccount<'info>,
 
     #[account(
@@ -63,7 +63,7 @@ pub struct TakeLease<'info> {
     )]
     pub lessee_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessee's ATA for the leased mint. Created on-demand if missing so the
+    /// Lessee's associated token account for the leased mint. Created on-demand if missing so the
     /// UI only has to hand over a lessee keypair plus the two mints.
     #[account(
         init_if_needed,
@@ -98,7 +98,7 @@ pub fn handle_take_lease(context: Context<TakeLease>) -> Result<()> {
         &context.accounts.token_program,
     )?;
 
-    // Pay out leased tokens from the vault PDA.
+    // Pay out leased tokens from the vault program-derived address.
     let lease_key = context.accounts.lease.key();
     let leased_vault_bump = context.accounts.lease.leased_vault_bump;
     let leased_vault_seeds: &[&[u8]] = &[
@@ -118,16 +118,16 @@ pub fn handle_take_lease(context: Context<TakeLease>) -> Result<()> {
         &signer_seeds,
     )?;
 
-    let end_ts = now
+    let end_timestamp = now
         .checked_add(duration_seconds)
         .ok_or(AssetLeasingError::MathOverflow)?;
 
     let lease = &mut context.accounts.lease;
     lease.lessee = context.accounts.lessee.key();
     lease.collateral_amount = required_collateral_amount;
-    lease.start_ts = now;
-    lease.end_ts = end_ts;
-    lease.last_paid_ts = now;
+    lease.start_timestamp = now;
+    lease.end_timestamp = end_timestamp;
+    lease.last_paid_timestamp = now;
     lease.status = LeaseStatus::Active;
 
     Ok(())

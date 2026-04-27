@@ -8,7 +8,7 @@ use crate::{
     constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
     errors::AssetLeasingError,
     instructions::{
-        pay_lease_fee::{compute_lease_fee_due, update_last_paid_ts},
+        pay_lease_fee::{compute_lease_fee_due, update_last_paid_timestamp},
         shared::{close_vault, transfer_tokens_from_user, transfer_tokens_from_vault},
     },
     state::{Lease, LeaseStatus},
@@ -77,7 +77,7 @@ pub struct ReturnLease<'info> {
     )]
     pub lessee_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessor's leased-mint ATA, created on demand. They may have sent the
+    /// Lessor's leased-mint associated token account, created on demand. They may have sent the
     /// original tokens from a different account.
     #[account(
         init_if_needed,
@@ -194,7 +194,7 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
         &[collateral_vault_seeds],
     )?;
 
-    update_last_paid_ts(&mut context.accounts.lease, now);
+    update_last_paid_timestamp(&mut context.accounts.lease, now);
     context.accounts.lease.collateral_amount = 0;
     context.accounts.lease.status = LeaseStatus::Closed;
 

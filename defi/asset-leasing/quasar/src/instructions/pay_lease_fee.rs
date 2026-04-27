@@ -16,7 +16,7 @@ pub struct PayLeaseFee<'info> {
     #[account(mut)]
     pub payer: &'info Signer,
 
-    /// PDA seed + `has_one` target. Not read directly.
+    /// program-derived address seed + `has_one` target. Not read directly.
     pub lessor: &'info UncheckedAccount,
 
     #[account(
@@ -53,7 +53,7 @@ pub fn handle_pay_lease_fee(accounts: &mut PayLeaseFee) -> Result<(), ProgramErr
     let lease_fee_amount = compute_lease_fee_due(accounts.lease, now)?;
 
     if lease_fee_amount == 0 {
-        update_last_paid_ts(accounts.lease, now);
+        update_last_paid_timestamp(accounts.lease, now);
         return Ok(());
     }
 
@@ -87,16 +87,16 @@ pub fn handle_pay_lease_fee(accounts: &mut PayLeaseFee) -> Result<(), ProgramErr
         accounts.lease.collateral_amount = new_collateral.into();
     }
 
-    update_last_paid_ts(accounts.lease, now);
+    update_last_paid_timestamp(accounts.lease, now);
     Ok(())
 }
 
-/// Lease fee accrues linearly: `(min(now, end_ts) - last_paid_ts) * rate`.
+/// Lease fee accrues linearly: `(min(now, end_timestamp) - last_paid_timestamp) * rate`.
 /// Shared with `return_lease` and `liquidate` for final settlement.
 pub fn compute_lease_fee_due(lease: &Lease, now: i64) -> Result<u64, ProgramError> {
-    let end_ts = lease.end_ts.get();
-    let last_paid = lease.last_paid_ts.get();
-    let cutoff = now.min(end_ts);
+    let end_timestamp = lease.end_timestamp.get();
+    let last_paid = lease.last_paid_timestamp.get();
+    let cutoff = now.min(end_timestamp);
     if cutoff <= last_paid {
         return Ok(0);
     }
@@ -106,10 +106,10 @@ pub fn compute_lease_fee_due(lease: &Lease, now: i64) -> Result<u64, ProgramErro
         .ok_or_else(|| AssetLeasingError::MathOverflow.into())
 }
 
-/// Advance `last_paid_ts`, but never past `end_ts` — once the lease
+/// Advance `last_paid_timestamp`, but never past `end_timestamp` — once the lease
 /// is over, extra Lease fees do not accrue.
-pub fn update_last_paid_ts(lease: &mut Lease, now: i64) {
-    let end_ts = lease.end_ts.get();
-    let capped = now.min(end_ts);
-    lease.last_paid_ts = capped.into();
+pub fn update_last_paid_timestamp(lease: &mut Lease, now: i64) {
+    let end_timestamp = lease.end_timestamp.get();
+    let capped = now.min(end_timestamp);
+    lease.last_paid_timestamp = capped.into();
 }

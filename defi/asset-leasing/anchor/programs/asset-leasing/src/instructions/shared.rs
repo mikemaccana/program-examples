@@ -27,7 +27,7 @@ pub fn transfer_tokens_from_user<'info>(
     )
 }
 
-/// Transfer tokens out of a PDA-owned vault using the supplied signer seeds.
+/// Transfer tokens out of a program-derived address-owned vault using the supplied signer seeds.
 /// Used by the program when moving tokens held under its authority.
 pub fn transfer_tokens_from_vault<'info>(
     from: &InterfaceAccount<'info, TokenAccount>,
@@ -51,10 +51,10 @@ pub fn transfer_tokens_from_vault<'info>(
     )
 }
 
-/// Close a PDA-owned token vault and forward its rent-exempt lamports to
+/// Close a program-derived address-owned token vault and forward its rent-exempt lamports to
 /// `destination`. The vault is its own token-account authority, so the caller
 /// just passes the same vault `AccountInfo` as both the account and the
-/// authority, with the vault's signer seeds for the CPI.
+/// authority, with the vault's signer seeds for the cross-program invocation.
 ///
 /// `destination` is an `AccountInfo` so callers can pass whichever wrapper
 /// they hold (`Signer`, `UncheckedAccount`, etc.) via `.to_account_info()`.

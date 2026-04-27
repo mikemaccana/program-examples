@@ -3,8 +3,8 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::{
     constants::{
-        COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED, MAX_LIQUIDATION_BOUNTY_BPS,
-        MAX_MAINTENANCE_MARGIN_BPS,
+        COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED, MAX_LIQUIDATION_BOUNTY_BASIS_POINTS,
+        MAX_MAINTENANCE_MARGIN_BASIS_POINTS,
     },
     errors::AssetLeasingError,
     instructions::shared::transfer_tokens_from_user,
@@ -40,8 +40,8 @@ pub struct CreateLease<'info> {
     )]
     pub lease: Account<'info, Lease>,
 
-    /// PDA-owned vault holding the leased tokens while `Listed`. Authority is
-    /// the vault PDA itself so the lease account does not need to sign for
+    /// program-derived address-owned vault holding the leased tokens while `Listed`. Authority is
+    /// the vault program-derived address itself so the lease account does not need to sign for
     /// returns / liquidation; any handler just signs with the vault seeds.
     #[account(
         init,
@@ -77,8 +77,8 @@ pub fn handle_create_lease(
     required_collateral_amount: u64,
     lease_fee_per_second: u64,
     duration_seconds: i64,
-    maintenance_margin_bps: u16,
-    liquidation_bounty_bps: u16,
+    maintenance_margin_basis_points: u16,
+    liquidation_bounty_basis_points: u16,
     feed_id: [u8; 32],
 ) -> Result<()> {
     // Reject leased_mint == collateral_mint. Allowing both to be the same
@@ -99,11 +99,11 @@ pub fn handle_create_lease(
     require!(lease_fee_per_second > 0, AssetLeasingError::InvalidLeaseFeePerSecond);
     require!(duration_seconds > 0, AssetLeasingError::InvalidDuration);
     require!(
-        maintenance_margin_bps > 0 && maintenance_margin_bps <= MAX_MAINTENANCE_MARGIN_BPS,
+        maintenance_margin_basis_points > 0 && maintenance_margin_basis_points <= MAX_MAINTENANCE_MARGIN_BASIS_POINTS,
         AssetLeasingError::InvalidMaintenanceMargin
     );
     require!(
-        liquidation_bounty_bps <= MAX_LIQUIDATION_BOUNTY_BPS,
+        liquidation_bounty_basis_points <= MAX_LIQUIDATION_BOUNTY_BASIS_POINTS,
         AssetLeasingError::InvalidLiquidationBounty
     );
 
@@ -133,13 +133,13 @@ pub fn handle_create_lease(
         required_collateral_amount,
         lease_fee_per_second,
         duration_seconds,
-        // start_ts / end_ts / last_paid_ts are set when the lease
+        // start_timestamp / end_timestamp / last_paid_timestamp are set when the lease
         // activates in `take_lease`.
-        start_ts: 0,
-        end_ts: 0,
-        last_paid_ts: 0,
-        maintenance_margin_bps,
-        liquidation_bounty_bps,
+        start_timestamp: 0,
+        end_timestamp: 0,
+        last_paid_timestamp: 0,
+        maintenance_margin_basis_points,
+        liquidation_bounty_basis_points,
         feed_id,
         status: LeaseStatus::Listed,
         bump: context.bumps.lease,

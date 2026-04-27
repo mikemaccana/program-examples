@@ -1,8 +1,8 @@
 use {
     crate::{
         constants::{
-            COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED, MAX_LIQUIDATION_BOUNTY_BPS,
-            MAX_MAINTENANCE_MARGIN_BPS,
+            COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED, MAX_LIQUIDATION_BOUNTY_BASIS_POINTS,
+            MAX_MAINTENANCE_MARGIN_BASIS_POINTS,
         },
         errors::AssetLeasingError,
         state::{Lease, LeaseStatus},
@@ -12,7 +12,7 @@ use {
 };
 
 /// Accounts needed to create a new `Listed` lease. The lessor funds the
-/// lease state account and both PDA-owned token vaults up front, then
+/// lease state account and both program-derived address-owned token vaults up front, then
 /// transfers the leased tokens into the leased vault in the same
 /// transaction so a lessee can never accept a lease the lessor has not
 /// pre-funded.
@@ -25,8 +25,8 @@ pub struct CreateLease<'info> {
     pub collateral_mint: &'info Account<Mint>,
 
     /// Lessor's existing token account for the leased mint. Pre-created by
-    /// the caller — the Quasar port does not do `init_if_needed` ATAs
-    /// (the Anchor version does, via CPI to the Associated Token Account
+    /// the caller — the Quasar port does not do `init_if_needed` associated token accounts
+    /// (the Anchor version does, via cross-program invocation to the Associated Token Account
     /// program; see the Quasar section of the README for the rationale).
     #[account(mut)]
     pub lessor_leased_account: &'info mut Account<Token>,
@@ -40,7 +40,7 @@ pub struct CreateLease<'info> {
     )]
     pub lease: &'info mut Account<Lease>,
 
-    /// Leased-token vault. Authority is the vault PDA itself — signing
+    /// Leased-token vault. Authority is the vault program-derived address itself — signing
     /// with the vault seeds is the only way to move tokens out.
     #[account(
         mut,
@@ -79,8 +79,8 @@ pub fn handle_create_lease(
     required_collateral_amount: u64,
     lease_fee_per_second: u64,
     duration_seconds: i64,
-    maintenance_margin_bps: u16,
-    liquidation_bounty_bps: u16,
+    maintenance_margin_basis_points: u16,
+    liquidation_bounty_basis_points: u16,
     feed_id: [u8; 32],
     bumps: &CreateLeaseBumps,
 ) -> Result<(), ProgramError> {
@@ -103,11 +103,11 @@ pub fn handle_create_lease(
     );
     require!(duration_seconds > 0, AssetLeasingError::InvalidDuration);
     require!(
-        maintenance_margin_bps > 0 && maintenance_margin_bps <= MAX_MAINTENANCE_MARGIN_BPS,
+        maintenance_margin_basis_points > 0 && maintenance_margin_basis_points <= MAX_MAINTENANCE_MARGIN_BASIS_POINTS,
         AssetLeasingError::InvalidMaintenanceMargin
     );
     require!(
-        liquidation_bounty_bps <= MAX_LIQUIDATION_BOUNTY_BPS,
+        liquidation_bounty_basis_points <= MAX_LIQUIDATION_BOUNTY_BASIS_POINTS,
         AssetLeasingError::InvalidLiquidationBounty
     );
 
@@ -138,12 +138,12 @@ pub fn handle_create_lease(
         required_collateral_amount,
         lease_fee_per_second,
         duration_seconds,
-        // start_ts / end_ts / last_paid_ts set on `take_lease`.
+        // start_timestamp / end_timestamp / last_paid_timestamp set on `take_lease`.
         0,
         0,
         0,
-        maintenance_margin_bps,
-        liquidation_bounty_bps,
+        maintenance_margin_basis_points,
+        liquidation_bounty_basis_points,
         feed_id,
         LeaseStatus::Listed as u8,
         bumps.lease,

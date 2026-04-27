@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 ///   Active      --return_lease-->   Closed
 ///   Active      --liquidate-->      Liquidated
 ///   Listed      --close_expired-->  Closed  (lessor cancels unrented lease)
-///   Active      --close_expired-->  Closed  (after end_ts, defaulted lessee)
+///   Active      --close_expired-->  Closed  (after end_timestamp, defaulted lessee)
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
 pub enum LeaseStatus {
     Listed,
@@ -18,7 +18,7 @@ pub enum LeaseStatus {
 #[derive(InitSpace)]
 pub struct Lease {
     /// Caller-supplied id so one lessor can run many leases in parallel. The
-    /// PDA is seeded by (LEASE_SEED, lessor, lease_id).
+    /// program-derived address is seeded by (LEASE_SEED, lessor, lease_id).
     pub lease_id: u64,
     /// Account that listed the lease and receives the lease fee. Always set.
     pub lessor: Pubkey,
@@ -42,21 +42,21 @@ pub struct Lease {
     /// from the collateral vault to the lessor on each `pay_lease_fee`.
     pub lease_fee_per_second: u64,
     /// Length of the lease, in seconds. Set at creation, used to compute
-    /// `end_ts` when the lease activates.
+    /// `end_timestamp` when the lease activates.
     pub duration_seconds: i64,
     /// Unix timestamp when the lease becomes active (set on `take_lease`).
-    pub start_ts: i64,
+    pub start_timestamp: i64,
     /// Unix timestamp after which the lease expires. 0 while `Listed`.
-    pub end_ts: i64,
-    /// Last time the lease fee was settled. Lease fee accrues from here to `now.min(end_ts)`.
-    pub last_paid_ts: i64,
+    pub end_timestamp: i64,
+    /// Last time the lease fee was settled. Lease fee accrues from here to `now.min(end_timestamp)`.
+    pub last_paid_timestamp: i64,
 
     /// Required collateral value as a percentage of the leased value,
-    /// expressed in basis points. 12_000 bps = 120%.
-    pub maintenance_margin_bps: u16,
+    /// expressed in basis points. 12_000 basis points = 120%.
+    pub maintenance_margin_basis_points: u16,
     /// Share of the seized collateral paid to the keeper that liquidates the
     /// lease, expressed in basis points of `collateral_amount`.
-    pub liquidation_bounty_bps: u16,
+    pub liquidation_bounty_basis_points: u16,
 
     /// Pyth `PriceUpdateV2.feed_id` that this lease is pinned to. The
     /// liquidation handler refuses price updates whose on-account `feed_id`
@@ -68,7 +68,7 @@ pub struct Lease {
     /// Current lifecycle state.
     pub status: LeaseStatus,
 
-    /// Bump seeds — stored so CPIs can sign without re-deriving.
+    /// Bump seeds — stored so cross-program invocations can sign without re-deriving.
     pub bump: u8,
     pub leased_vault_bump: u8,
     pub collateral_vault_bump: u8,

@@ -7,7 +7,7 @@ seizure path when the collateral is no longer worth enough.
 Every instruction handler is walked through with the exact token
 movements it causes. If you already know what collateral, a
 maintenance margin and an oracle are, you can skip straight to
-[Accounts and PDAs](#2-accounts-and-pdas) or
+[Accounts and program-derived addresses](#2-accounts-and-program-derived-addresses) or
 [Instruction handler lifecycle walkthrough](#3-instruction-handler-lifecycle-walkthrough).
 
 Solana terminology is defined at https://solana.com/docs/terminology.
@@ -19,7 +19,7 @@ appear.
 ## Table of contents
 
 1. [What does this program do?](#1-what-does-this-program-do)
-2. [Accounts and PDAs](#2-accounts-and-pdas)
+2. [Accounts and program-derived addresses](#2-accounts-and-program-derived-addresses)
 3. [Instruction handler lifecycle walkthrough](#3-instruction-handler-lifecycle-walkthrough)
 4. [Full-lifecycle worked examples](#4-full-lifecycle-worked-examples)
 5. [Safety and edge cases](#5-safety-and-edge-cases)
@@ -64,7 +64,7 @@ The program acts as a non-custodial escrow. It:
 
 The trigger for step 4 is the **maintenance margin**: a ratio,
 expressed in basis points (1 bp = 1/100 of a percent), of required
-collateral value to debt value. `maintenance_margin_bps = 12_000` is
+collateral value to debt value. `maintenance_margin_basis_points = 12_000` is
 120%, meaning the collateral must stay worth at least 1.2× the leased
 tokens. Drop below and the position becomes liquidatable.
 
@@ -119,8 +119,8 @@ Alice lists the lease (assume USDC is 6-decimal, xNVDA is also
 | `required_collateral_amount` | `22_000_000_000` (22 000 USDC) | ~122% LTV at the spot price |
 | `lease_fee_per_second` | `456` (USDC base units / s) | ≈ 8% APR on 18 000 USDC notional |
 | `duration_seconds` | `2_592_000` | 30 days |
-| `maintenance_margin_bps` | `11_000` | 110% |
-| `liquidation_bounty_bps` | `100` | 1% of post-fee collateral |
+| `maintenance_margin_basis_points` | `11_000` | 110% |
+| `liquidation_bounty_basis_points` | `100` | 1% of post-fee collateral |
 | `feed_id` | Pyth xNVDA/USD feed id | ([Pyth feed registry](https://www.pyth.network/price-feeds)) |
 
 Bob calls `take_lease`, posts 22 000 USDC, receives 100 xNVDA, and
@@ -173,24 +173,24 @@ applied to a real asset pair.
 
 ---
 
-## 2. Accounts and PDAs
+## 2. Accounts and program-derived addresses
 
 Every call to the program touches some subset of these accounts. The
-three PDAs are created on `create_lease` and destroyed on `return_lease`
+three program-derived addresses are created on `create_lease` and destroyed on `return_lease`
 / `liquidate` / `close_expired`.
 
 ### State / data accounts
 
-| Account | PDA? | Seeds | Kind | Authority | Holds |
+| Account | program-derived address? | Seeds | Kind | Authority | Holds |
 |---|---|---|---|---|---|
 | `Lease` | yes | `["lease", lessor, lease_id]` | data | program | all the lease parameters and current lifecycle state (see below) |
 
 ### Token vaults
 
-| Account | PDA? | Seeds | Kind | Authority | Holds |
+| Account | program-derived address? | Seeds | Kind | Authority | Holds |
 |---|---|---|---|---|---|
-| `leased_vault` | yes | `["leased_vault", lease]` | token account | itself (PDA-signed) | `leased_amount` while `Listed`; 0 while `Active` (lessee has the tokens); full amount again briefly inside `return_lease` |
-| `collateral_vault` | yes | `["collateral_vault", lease]` | token account | itself (PDA-signed) | 0 while `Listed`; `collateral_amount` while `Active`, decreasing as lease fee streams out and increasing on `top_up_collateral` |
+| `leased_vault` | yes | `["leased_vault", lease]` | token account | itself (program-derived address-signed) | `leased_amount` while `Listed`; 0 while `Active` (lessee has the tokens); full amount again briefly inside `return_lease` |
+| `collateral_vault` | yes | `["collateral_vault", lease]` | token account | itself (program-derived address-signed) | 0 while `Listed`; `collateral_amount` while `Active`, decreasing as lease fee streams out and increasing on `top_up_collateral` |
 
 ### User accounts passed in
 
@@ -200,11 +200,11 @@ three PDAs are created on `create_lease` and destroyed on `return_lease`
 | `lessee` wallet | user | `take_lease` / `top_up_collateral` / `return_lease` signer |
 | `keeper` wallet | user | `liquidate` signer, receives the bounty |
 | `payer` wallet | user | `pay_lease_fee` signer (can be anyone, not just the lessee) |
-| `lessor_leased_account` | token account | lessor's ATA for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired` |
-| `lessor_collateral_account` | token account | lessor's ATA for the collateral mint; destination for the lease fee and liquidation proceeds |
-| `lessee_leased_account` | token account | lessee's ATA for the leased mint; destination on `take_lease`, source on `return_lease` |
-| `lessee_collateral_account` | token account | lessee's ATA for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease` |
-| `keeper_collateral_account` | token account | keeper's ATA for the collateral mint; receives the liquidation bounty |
+| `lessor_leased_account` | token account | lessor's associated token account for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired` |
+| `lessor_collateral_account` | token account | lessor's associated token account for the collateral mint; destination for the lease fee and liquidation proceeds |
+| `lessee_leased_account` | token account | lessee's associated token account for the leased mint; destination on `take_lease`, source on `return_lease` |
+| `lessee_collateral_account` | token account | lessee's associated token account for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease` |
+| `keeper_collateral_account` | token account | keeper's associated token account for the collateral mint; receives the liquidation bounty |
 | `price_update` | Pyth Receiver program | `PriceUpdateV2` account for the feed the lease is pinned to |
 
 ### Fields on `Lease`
@@ -226,12 +226,12 @@ pub struct Lease {
 
     pub lease_fee_per_second: u64,      // denominated in collateral units
     pub duration_seconds: i64,
-    pub start_ts: i64,             // 0 while Listed
-    pub end_ts: i64,               // 0 while Listed; start_ts + duration once Active
-    pub last_paid_ts: i64,    // Lease fee accrues from here to min(now, end_ts)
+    pub start_timestamp: i64,             // 0 while Listed
+    pub end_timestamp: i64,               // 0 while Listed; start_timestamp + duration once Active
+    pub last_paid_timestamp: i64,    // Lease fee accrues from here to min(now, end_timestamp)
 
-    pub maintenance_margin_bps: u16,   // e.g. 12_000 = 120%
-    pub liquidation_bounty_bps: u16,   // e.g. 500 = 5%
+    pub maintenance_margin_basis_points: u16,   // e.g. 12_000 = 120%
+    pub liquidation_bounty_basis_points: u16,   // e.g. 500 = 5%
 
     pub feed_id: [u8; 32],         // Pyth feed_id this lease is pinned to
 
@@ -257,7 +257,7 @@ pub struct Lease {
                |    Active     | ----> | Closed |
                +---------------+       +--------+
                  |    |       |
-     return_lease|    |       | close_expired (after end_ts)
+     return_lease|    |       | close_expired (after end_timestamp)
                  |    | liquidate
                  v    v       v
              +--------+ +-----------+
@@ -291,7 +291,7 @@ them — the order below — is:
 7. `close_expired` (lessor) — **default / cancel path**
 
 For each, the shape is the same: who signs, what accounts go in, which
-PDAs get created or closed, which tokens move, what state changes, what
+program-derived addresses get created or closed, which tokens move, what state changes, what
 checks the program runs.
 
 Token-flow diagrams use the following shorthand:
@@ -317,8 +317,8 @@ pub fn create_lease(
     required_collateral_amount: u64,
     lease_fee_per_second: u64,
     duration_seconds: i64,
-    maintenance_margin_bps: u16,
-    liquidation_bounty_bps: u16,
+    maintenance_margin_basis_points: u16,
+    liquidation_bounty_basis_points: u16,
     feed_id: [u8; 32],
 ) -> Result<()>
 ```
@@ -327,13 +327,13 @@ pub fn create_lease(
 
 - `lessor` (signer, mut — pays account rent)
 - `leased_mint`, `collateral_mint` (read-only)
-- `lessor_leased_account` (mut, lessor's ATA for the leased mint — source)
-- `lease` (PDA, **init**) — created here
-- `leased_vault` (PDA, **init**, token account) — created here
-- `collateral_vault` (PDA, **init**, token account) — created here
+- `lessor_leased_account` (mut, lessor's associated token account for the leased mint — source)
+- `lease` (program-derived address, **init**) — created here
+- `leased_vault` (program-derived address, **init**, token account) — created here
+- `collateral_vault` (program-derived address, **init**, token account) — created here
 - `token_program`, `system_program`
 
-**PDAs created:**
+**program-derived addresses created:**
 
 - `lease` with seeds `[b"lease", lessor, lease_id.to_le_bytes()]`
 - `leased_vault` with seeds `[b"leased_vault", lease]`, authority = itself
@@ -346,26 +346,26 @@ pub fn create_lease(
 - `required_collateral_amount > 0` → `InvalidCollateralAmount`
 - `lease_fee_per_second > 0` → `InvalidLeaseFeePerSecond`
 - `duration_seconds > 0` → `InvalidDuration`
-- `0 < maintenance_margin_bps <= 50_000` → `InvalidMaintenanceMargin`
-- `liquidation_bounty_bps <= 2_000` → `InvalidLiquidationBounty`
+- `0 < maintenance_margin_basis_points <= 50_000` → `InvalidMaintenanceMargin`
+- `liquidation_bounty_basis_points <= 2_000` → `InvalidLiquidationBounty`
 
 **Token movements:**
 
 ```
-  lessor_leased_account --[leased_amount of leased_mint]--> leased_vault PDA
+  lessor_leased_account --[leased_amount of leased_mint]--> leased_vault program-derived address
 ```
 
 **State changes:**
 
 - New `Lease` account written with `status = Listed`, `lessee =
-  Pubkey::default()`, `collateral_amount = 0`, `start_ts = 0`,
-  `end_ts = 0`, `last_paid_ts = 0`, and the given parameters
+  Pubkey::default()`, `collateral_amount = 0`, `start_timestamp = 0`,
+  `end_timestamp = 0`, `last_paid_timestamp = 0`, and the given parameters
   including `feed_id`. All three bumps stored.
 
 **Why lock the leased tokens up-front rather than on `take_lease`?** So a
 lessee who calls `take_lease` cannot possibly fail because the lessor
 doesn't have the tokens any more — the atomicity guarantee is
-transferred to the PDA the moment the lease is listed.
+transferred to the program-derived address the moment the lease is listed.
 
 ### 3.2 `take_lease`
 
@@ -378,13 +378,13 @@ take delivery.
 **Accounts in:**
 
 - `lessee` (signer, mut)
-- `lessor` (UncheckedAccount — read for PDA seed derivation only, no
+- `lessor` (UncheckedAccount — read for program-derived address seed derivation only, no
   signature required)
 - `lease` (mut, `has_one = lessor`, `has_one = leased_mint`,
   `has_one = collateral_mint`, must be `Listed`)
 - `leased_mint`, `collateral_mint`
-- `leased_vault`, `collateral_vault` (both mut, both PDA-derived)
-- `lessee_collateral_account` (mut, lessee's ATA — source)
+- `leased_vault`, `collateral_vault` (both mut, both program-derived address-derived)
+- `lessee_collateral_account` (mut, lessee's associated token account — source)
 - `lessee_leased_account` (mut, **init_if_needed** — destination)
 - `token_program`, `associated_token_program`, `system_program`
 
@@ -398,8 +398,8 @@ take delivery.
 **Token movements (in order):**
 
 ```
-  lessee_collateral_account --[required_collateral_amount of collateral_mint]--> collateral_vault PDA
-  leased_vault PDA         --[leased_amount of leased_mint]-----------------> lessee_leased_account
+  lessee_collateral_account --[required_collateral_amount of collateral_mint]--> collateral_vault program-derived address
+  leased_vault program-derived address         --[leased_amount of leased_mint]-----------------> lessee_leased_account
 ```
 
 Collateral is deposited *first* so if the leased-token transfer fails
@@ -410,9 +410,9 @@ collateral back.
 
 - `lease.lessee = lessee.key()`
 - `lease.collateral_amount = required_collateral_amount`
-- `lease.start_ts = now`
-- `lease.end_ts = now + duration_seconds` (checked add, errors on overflow)
-- `lease.last_paid_ts = now` (nothing has accrued yet)
+- `lease.start_timestamp = now`
+- `lease.end_timestamp = now + duration_seconds` (checked add, errors on overflow)
+- `lease.last_paid_timestamp = now` (nothing has accrued yet)
 - `lease.status = Active`
 
 ### 3.3 `pay_lease_fee`
@@ -425,7 +425,7 @@ liquidation check so healthy leases stay healthy.
 
 **Accounts in:**
 
-- `payer` (signer, mut — pays for `init_if_needed` of the lessor ATA)
+- `payer` (signer, mut — pays for `init_if_needed` of the lessor associated token account)
 - `lessor` (UncheckedAccount, read-only — used for `has_one` check)
 - `lease` (mut, must be `Active`)
 - `collateral_mint`, `collateral_vault`
@@ -436,24 +436,24 @@ liquidation check so healthy leases stay healthy.
 
 ```rust
 pub fn compute_lease_fee_due(lease: &Lease, now: i64) -> Result<u64> {
-    let cutoff = now.min(lease.end_ts);
-    if cutoff <= lease.last_paid_ts {
+    let cutoff = now.min(lease.end_timestamp);
+    if cutoff <= lease.last_paid_timestamp {
         return Ok(0);
     }
-    let elapsed = (cutoff - lease.last_paid_ts) as u64;
+    let elapsed = (cutoff - lease.last_paid_timestamp) as u64;
     elapsed.checked_mul(lease.lease_fee_per_second)
         .ok_or(AssetLeasingError::MathOverflow.into())
 }
 ```
 
-Lease fees do not accrue past `end_ts`. Past the deadline the lessee is
+Lease fees do not accrue past `end_timestamp`. Past the deadline the lessee is
 either returning the tokens (via `return_lease`), being liquidated, or
 defaulting — no more lease fees are owed.
 
 **Token movements:**
 
 ```
-  collateral_vault PDA --[min(lease_fee_due, collateral_amount) of collateral_mint]--> lessor_collateral_account
+  collateral_vault program-derived address --[min(lease_fee_due, collateral_amount) of collateral_mint]--> lessor_collateral_account
 ```
 
 If the vault does not have enough collateral to cover the full
@@ -464,7 +464,7 @@ clean up.
 **State changes:**
 
 - `lease.collateral_amount -= payable`
-- `lease.last_paid_ts = now.min(end_ts)`
+- `lease.last_paid_timestamp = now.min(end_timestamp)`
 
 ### 3.4 `top_up_collateral`
 
@@ -494,7 +494,7 @@ by adding more of the collateral mint to the vault.
 **Token movements:**
 
 ```
-  lessee_collateral_account --[amount of collateral_mint]--> collateral_vault PDA
+  lessee_collateral_account --[amount of collateral_mint]--> collateral_vault program-derived address
 ```
 
 **State changes:**
@@ -504,8 +504,8 @@ by adding more of the collateral mint to the vault.
 ### 3.5 `return_lease`
 
 **Who calls it:** the lessee, while the lease is still `Active` and
-before or after `end_ts` (the only timing rule is that `status ==
-Active`; Lease fees only accrue up to `end_ts` so returning after the
+before or after `end_timestamp` (the only timing rule is that `status ==
+Active`; Lease fees only accrue up to `end_timestamp` so returning after the
 deadline does not pile on extra charges).
 
 **Signers:** `lessee`.
@@ -532,27 +532,27 @@ deadline does not pile on extra charges).
 **Token movements (in order):**
 
 ```
-  lessee_leased_account   --[leased_amount of leased_mint]----------> leased_vault PDA
-  leased_vault PDA        --[leased_amount of leased_mint]----------> lessor_leased_account
-  collateral_vault PDA    --[lease_fee_payable of collateral_mint]-------> lessor_collateral_account
-  collateral_vault PDA    --[collateral_after_lease_fees of collateral_mint]--> lessee_collateral_account
+  lessee_leased_account   --[leased_amount of leased_mint]----------> leased_vault program-derived address
+  leased_vault program-derived address        --[leased_amount of leased_mint]----------> lessor_leased_account
+  collateral_vault program-derived address    --[lease_fee_payable of collateral_mint]-------> lessor_collateral_account
+  collateral_vault program-derived address    --[collateral_after_lease_fees of collateral_mint]--> lessee_collateral_account
 ```
 
 The leased tokens hop through the vault rather than going direct
 lessee→lessor because the vault's token account is already set up and
-the program can reuse its PDA signing path. The atomic round-trip keeps
-the vault's post-ix balance at 0 so it can be closed.
+the program can reuse its program-derived address signing path. The atomic round-trip keeps
+the vault's post-instruction balance at 0 so it can be closed.
 
 After the transfers:
 
-- Both vaults are closed via `close_account` CPIs; their rent-exempt
+- Both vaults are closed via `close_account` cross-program invocations; their rent-exempt
   lamports go to the lessor.
 - The `Lease` account is closed via Anchor's `close = lessor`
   constraint; its rent-exempt lamports go to the lessor too.
 
 **State changes before close:**
 
-- `lease.last_paid_ts = now.min(end_ts)`
+- `lease.last_paid_timestamp = now.min(end_timestamp)`
 - `lease.collateral_amount = 0`
 - `lease.status = Closed`
 
@@ -565,7 +565,7 @@ underwater.
 
 **Accounts in:**
 
-- `keeper` (signer, mut — pays `init_if_needed` cost for both ATAs)
+- `keeper` (signer, mut — pays `init_if_needed` cost for both associated token accounts)
 - `lessor` (UncheckedAccount, mut — receives the lease fee + lessor_share + the
   `Lease` and vault rent-exempt lamports)
 - `lease` (mut, `close = lessor`, must be `Active`)
@@ -594,7 +594,7 @@ The underwater check, in integers:
 
 ```
   collateral_value_in_colla_units * 10_000
-      <  debt_value_in_colla_units * maintenance_margin_bps
+      <  debt_value_in_colla_units * maintenance_margin_basis_points
 ```
 
 where `debt_value = leased_amount * price * 10^exponent` (with the
@@ -604,10 +604,10 @@ exponent folded into whichever side keeps the math non-negative, see
 **Token movements:**
 
 ```
-  collateral_vault PDA --[lease_fee_payable of collateral_mint]---------------------> lessor_collateral_account
-  collateral_vault PDA --[bounty = remaining * bounty_bps / 10_000]-----------> keeper_collateral_account
-  collateral_vault PDA --[remaining - bounty of collateral_mint]--------------> lessor_collateral_account
-  leased_vault PDA    --[0 of leased_mint]  (empty — lessee kept the tokens)    close only
+  collateral_vault program-derived address --[lease_fee_payable of collateral_mint]---------------------> lessor_collateral_account
+  collateral_vault program-derived address --[bounty = remaining * bounty_basis_points / 10_000]-----------> keeper_collateral_account
+  collateral_vault program-derived address --[remaining - bounty of collateral_mint]--------------> lessor_collateral_account
+  leased_vault program-derived address    --[0 of leased_mint]  (empty — lessee kept the tokens)    close only
 ```
 
 After the three outbound collateral transfers (lease fee, bounty, lessor
@@ -618,7 +618,7 @@ closed the same way (Anchor `close = lessor`).
 **State changes before close:**
 
 - `lease.collateral_amount = 0`
-- `lease.last_paid_ts = now.min(end_ts)`
+- `lease.last_paid_timestamp = now.min(end_timestamp)`
 - `lease.status = Liquidated`
 
 ### 3.7 `close_expired`
@@ -629,7 +629,7 @@ into this single handler:
 - **Cancel a `Listed` lease** — the lessor changes their mind, no-one
   has taken the lease yet. Allowed any time.
 - **Reclaim collateral after default** — the lease is `Active`, `now >=
-  end_ts`, the lessee has not called `return_lease`. The lessor takes
+  end_timestamp`, the lessee has not called `return_lease`. The lessor takes
   the whole collateral vault as compensation.
 
 **Signers:** `lessor`.
@@ -648,20 +648,20 @@ into this single handler:
 
 - `status ∈ {Listed, Active}` (Anchor `constraint matches!(...)`) →
   `InvalidLeaseStatus`
-- If `status == Active`, also `now >= end_ts` → `LeaseNotExpired`
+- If `status == Active`, also `now >= end_timestamp` → `LeaseNotExpired`
 
 **Token movements:**
 
 For a `Listed` cancel:
 ```
-  leased_vault PDA --[leased_amount of leased_mint]--> lessor_leased_account
-  collateral_vault PDA is empty (0 transferred)
+  leased_vault program-derived address --[leased_amount of leased_mint]--> lessor_leased_account
+  collateral_vault program-derived address is empty (0 transferred)
 ```
 
 For an `Active` default:
 ```
-  leased_vault PDA is empty (lessee kept the tokens)
-  collateral_vault PDA --[collateral_amount of collateral_mint]--> lessor_collateral_account
+  leased_vault program-derived address is empty (lessee kept the tokens)
+  collateral_vault program-derived address --[collateral_amount of collateral_mint]--> lessor_collateral_account
 ```
 
 In both cases both vaults are then closed and the `Lease` account is
@@ -669,7 +669,7 @@ closed; all three rent-exempt lamport refunds go to the lessor.
 
 **State changes before close:**
 
-- If `Active`: `lease.last_paid_ts = now.min(end_ts)`
+- If `Active`: `lease.last_paid_timestamp = now.min(end_timestamp)`
   (settles the accounting so any future program version that wants
   to split the default pot differently has a correct timestamp to
   start from)
@@ -681,62 +681,67 @@ closed; all three rent-exempt lamport refunds go to the lessor.
 ## 4. Full-lifecycle worked examples
 
 All three use the same starting numbers so the arithmetic is easy to
-follow. Both mints are 6-decimal tokens. "LEASED" means one base
-unit of the leased mint; "COLLA" means one base unit of the collateral
-mint.
+follow. Both mints are 6-decimal tokens, so 1 token = 1 000 000 base
+units. Throughout this section, "leased units" means base units of
+the leased mint and "collateral units" means base units of the
+collateral mint — they are descriptive labels, not real tickers.
+The diagrams use the same convention: `[<number> leased]` and
+`[<number> collateral]`.
 
-- `leased_amount = 100_000_000` LEASED (100 tokens).
-- `required_collateral_amount = 200_000_000` COLLA (200 tokens).
-- `lease_fee_per_second = 10` COLLA.
+- `leased_amount = 100_000_000` (100 leased tokens).
+- `required_collateral_amount = 200_000_000` (200 collateral tokens).
+- `lease_fee_per_second = 10` collateral units.
 - `duration_seconds = 86_400` (24 hours).
-- `maintenance_margin_bps = 12_000` (120%).
-- `liquidation_bounty_bps = 500` (5% of post-lease-fee collateral).
+- `maintenance_margin_basis_points = 12_000` (120%).
+- `liquidation_bounty_basis_points = 500` (5% of post-lease-fee collateral).
 - `feed_id = [0xAB; 32]` (arbitrary, consistent across all calls).
 
-Lessor starts with 1 000 000 000 LEASED in their ATA. Lessee starts
-with 1 000 000 000 COLLA in theirs.
+Lessor starts with 1 000 000 000 leased units in
+their associated token account. Lessee starts with 1 000 000 000
+collateral units in theirs.
 
 ### 4.1 Happy path — lessee returns on time
 
 Calls, in order:
 
-1. **`create_lease`** — lessor posts 100 LEASED into `leased_vault`,
-   parameters written to `lease`.
+1. **`create_lease`** — lessor posts 100 leased tokens into
+   `leased_vault`, parameters written to `lease`.
    ```
-   lessor_leased_account --[100_000_000 LEASED]--> leased_vault PDA
+   lessor_leased_account --[100_000_000 leased]--> leased_vault program-derived address
    ```
-   Balances after: lessor has 900 000 000 LEASED, `leased_vault` has
-   100 000 000 LEASED, `collateral_vault` has 0.
+   Balances after: lessor has 900 000 000 leased units, `leased_vault` has
+   100 000 000 leased units, `collateral_vault` has 0.
 
-2. **`take_lease`** — lessee posts 200 COLLA, receives 100 LEASED.
+2. **`take_lease`** — lessee posts 200 collateral tokens, receives
+   100 leased tokens.
    ```
-   lessee_collateral_account --[200_000_000 COLLA]--> collateral_vault PDA
-   leased_vault PDA          --[100_000_000 LEASED]--> lessee_leased_account
+   lessee_collateral_account --[200_000_000 collateral]--> collateral_vault program-derived address
+   leased_vault program-derived address          --[100_000_000 leased]--> lessee_leased_account
    ```
-   `lease.status = Active`, `start_ts = T`, `end_ts = T + 86_400`.
+   `lease.status = Active`, `start_timestamp = T`, `end_timestamp = T + 86_400`.
 
 3. **`pay_lease_fee`** called at `T + 120` seconds. Lease fee due = 120 × 10 =
-   1 200 COLLA.
+   1 200 collateral units.
    ```
-   collateral_vault PDA --[1_200 COLLA]--> lessor_collateral_account
+   collateral_vault program-derived address --[1_200 collateral]--> lessor_collateral_account
    ```
    `collateral_amount = 200_000_000 − 1_200 = 199_998_800`.
 
 4. **`top_up_collateral(amount = 50_000_000)`** at `T + 600`. Lessee
    decides to add a cushion.
    ```
-   lessee_collateral_account --[50_000_000 COLLA]--> collateral_vault PDA
+   lessee_collateral_account --[50_000_000 collateral]--> collateral_vault program-derived address
    ```
    `collateral_amount = 199_998_800 + 50_000_000 = 249_998_800`.
 
 5. **`return_lease`** called at `T + 3_600` (one hour in). Total lease fees
-   from `start_ts` to `now` is 3 600 × 10 = 36 000 COLLA; 1 200 of that
-   was paid in step 3. Residual lease fees = 36 000 − 1 200 = 34 800 COLLA.
+   from `start_timestamp` to `now` is 3 600 × 10 = 36 000 collateral units; 1 200 of that
+   was paid in step 3. Residual lease fees = 36 000 − 1 200 = 34 800 collateral units.
    ```
-   lessee_leased_account  --[100_000_000 LEASED]--> leased_vault PDA
-   leased_vault PDA       --[100_000_000 LEASED]--> lessor_leased_account
-   collateral_vault PDA   --[34_800 COLLA]--------> lessor_collateral_account
-   collateral_vault PDA   --[249_964_000 COLLA]---> lessee_collateral_account
+   lessee_leased_account  --[100_000_000 leased]--> leased_vault program-derived address
+   leased_vault program-derived address       --[100_000_000 leased]--> lessor_leased_account
+   collateral_vault program-derived address   --[34_800 collateral]--------> lessor_collateral_account
+   collateral_vault program-derived address   --[249_964_000 collateral]---> lessee_collateral_account
    ```
    Where `249_964_000 = 249_998_800 − 34_800`.
 
@@ -745,11 +750,11 @@ Calls, in order:
 
 **Final balances:**
 
-- Lessor: 1 000 000 000 LEASED (full return), 36 000 COLLA (total lease fees
+- Lessor: 1 000 000 000 leased units (full return), 36 000 collateral units (total lease fees
   received in steps 3 + 5), plus the lamports from three account closes.
-- Lessee: 100 000 000 LEASED → 0 (all returned), COLLA: started with
+- Lessee: 100 000 000 leased units → 0 (all returned), collateral: started with
   1 000 000 000, spent 200 000 000 on initial deposit + 50 000 000 on
-  top-up, got back 249 964 000, so holds 999 964 000 COLLA (net cost
+  top-up, got back 249 964 000, so holds 999 964 000 collateral units (net cost
   of 36 000 — exactly the total lease fees paid).
 
 ### 4.2 Liquidation path
@@ -759,39 +764,39 @@ Same setup. Steps 1 and 2 run identically.
 3. Time jumps to `T + 300`. A keeper observes a new Pyth price update:
    the leased-in-collateral price has spiked to 4.0 (exponent 0, price
    = 4). At that price, the debt value is `100_000_000 × 4 =
-   400_000_000` COLLA. The collateral is still ~`200_000_000` COLLA
-   (minus some streamed lease fees). Maintenance ratio = `200/400 = 50%`,
-   well below the required 120%.
+   400_000_000` collateral units. The collateral
+   pot is still ~`200_000_000` (minus some streamed lease fees).
+   Maintenance ratio = `200/400 = 50%`, well below the required 120%.
 
    The keeper calls `pay_lease_fee` first is *not* required — `liquidate`
    settles accrued lease fees itself. It goes straight to `liquidate`.
 
 4. **`liquidate`** at `T + 300`:
-   - Lease fee due = 300 × 10 = 3 000 COLLA; collateral_amount = 200 000 000
+   - Lease fee due = 300 × 10 = 3 000 collateral units; collateral_amount = 200 000 000
      so `lease_fee_payable = 3 000`.
      ```
-     collateral_vault PDA --[3_000 COLLA]--> lessor_collateral_account
+     collateral_vault program-derived address --[3_000 collateral]--> lessor_collateral_account
      ```
-   - Remaining = 200 000 000 − 3 000 = 199 997 000 COLLA.
-   - Bounty = 199 997 000 × 500 / 10 000 = 9 999 850 COLLA.
+   - Remaining = 200 000 000 − 3 000 = 199 997 000 collateral units.
+   - Bounty = 199 997 000 × 500 / 10 000 = 9 999 850 collateral units.
      ```
-     collateral_vault PDA --[9_999_850 COLLA]--> keeper_collateral_account
+     collateral_vault program-derived address --[9_999_850 collateral]--> keeper_collateral_account
      ```
-   - Lessor share = 199 997 000 − 9 999 850 = 189 997 150 COLLA.
+   - Lessor share = 199 997 000 − 9 999 850 = 189 997 150 collateral units.
      ```
-     collateral_vault PDA --[189_997_150 COLLA]--> lessor_collateral_account
+     collateral_vault program-derived address --[189_997_150 collateral]--> lessor_collateral_account
      ```
    - Both vaults close; Lease closes. Status recorded as `Liquidated`.
 
 **Final balances:**
 
-- Lessor: 900 000 000 LEASED (never got the 100 back — the lessee kept
-  them), `3 000 + 189 997 150 = 190 000 150` COLLA, plus rent-exempt
-  lamports from three closes.
-- Lessee: *still* has 100 000 000 LEASED. Spent 200 000 000 COLLA on
+- Lessor: 900 000 000 leased units (never got the 100 back — the
+  lessee kept them), `3 000 + 189 997 150 = 190 000 150` collateral
+  units, plus rent-exempt lamports from three closes.
+- Lessee: *still* has 100 000 000 leased units. Spent 200 000 000 collateral units on
   deposit, got nothing back. Net: they walk away with the leased tokens
   but forfeited the entire collateral minus the keeper's cut.
-- Keeper: 9 999 850 COLLA for their trouble.
+- Keeper: 9 999 850 collateral units for their trouble.
 
 (This is the key asymmetry: liquidation does *not* reclaim the leased
 tokens. The collateral pays the lessor for the lost asset. The lessee
@@ -811,39 +816,40 @@ Same setup. Steps 1 and 2 run identically.
 3. Time jumps to `T + 300`. The leased-in-collateral price has
    *fallen* to 0.5 (exponent 0, price = 0). To make the math
    non-trivial, take exponent = −1, price = 5: the debt value is
-   `100_000_000 × 5 / 10 = 50_000_000` COLLA. The collateral is
-   ~`200_000_000` COLLA (minus a tiny bit of streamed lease fees).
-   Maintenance ratio = `200_000_000 / 50_000_000 = 400%`, far above
-   the required 120%.
+   `100_000_000 × 5 / 10 = 50_000_000` collateral units. The
+   collateral pot is ~`200_000_000` (minus a tiny bit of streamed
+   lease fees). Maintenance ratio = `200_000_000 / 50_000_000 =
+   400%`, far above the required 120%.
 
    A keeper calling `liquidate` here would fail with
    `PositionHealthy` — the program refuses to seize a healthy
    position. The lessee is in the clear.
 
 4. **`return_lease`** called at `T + 600` (10 minutes in). The
-   lessee buys 100 LEASED on the open market at the new price (about
-   50 COLLA total — far less than the 200 COLLA they posted), then
-   returns those tokens to close out the lease.
+   lessee buys 100 leased tokens on the open market at the new price
+   (about 50 collateral tokens total — far less than the 200
+   collateral tokens they posted), then returns those tokens to
+   close out the lease.
 
-   Lease fees accrued: 600 × 10 = 6 000 COLLA.
+   Lease fees accrued: 600 × 10 = 6 000 collateral units.
 
    ```
-   lessee_leased_account  --[100_000_000 LEASED]--> leased_vault PDA
-   leased_vault PDA       --[100_000_000 LEASED]--> lessor_leased_account
-   collateral_vault PDA   --[6_000 COLLA]---------> lessor_collateral_account
-   collateral_vault PDA   --[199_994_000 COLLA]---> lessee_collateral_account
+   lessee_leased_account  --[100_000_000 leased]--> leased_vault program-derived address
+   leased_vault program-derived address       --[100_000_000 leased]--> lessor_leased_account
+   collateral_vault program-derived address   --[6_000 collateral]---------> lessor_collateral_account
+   collateral_vault program-derived address   --[199_994_000 collateral]---> lessee_collateral_account
    ```
 
 **Final balances:**
 
-- Lessor: 1 000 000 000 LEASED (full return), 6 000 COLLA in lease
+- Lessor: 1 000 000 000 leased units (full return), 6 000 collateral units in lease
   fees.
-- Lessee: 100 000 000 LEASED received → bought 100 LEASED back at
-  the lower price → returned them. Their net cost is the lease fee
-  (6 000 COLLA) plus whatever they paid on the open market for the
-  replacement leased tokens; their gain is the difference between
-  what they originally received the leased tokens at versus what
-  they paid to re-acquire them.
+- Lessee: 100 000 000 leased units received → bought 100 leased tokens
+  back at the lower price → returned them. Their net cost is the
+  lease fee (6 000 collateral units) plus whatever
+  they paid on the open market for the replacement leased tokens;
+  their gain is the difference between what they originally received
+  the leased tokens at versus what they paid to re-acquire them.
 
 This is the same payoff shape as a short on the leased asset: the
 lessee profits from price drops and pays a small carry (the lease
@@ -857,26 +863,26 @@ Same setup. Steps 1 and 2 run as usual. The lessee takes the tokens,
 posts collateral, then disappears.
 
 3. `pay_lease_fee` is never called. Clock advances all the way past
-   `end_ts = T + 86_400`.
+   `end_timestamp = T + 86_400`.
 
 4. **`close_expired`** called by the lessor at `T + 100_000`:
-   - `status == Active` and `now >= end_ts` → the default branch runs.
+   - `status == Active` and `now >= end_timestamp` → the default branch runs.
    - `leased_vault` is empty (lessee kept the tokens). No transfer.
-   - `collateral_vault` has 200 000 000 COLLA. All of it goes to the
+   - `collateral_vault` has 200 000 000 collateral units. All of it goes to the
      lessor:
      ```
-     collateral_vault PDA --[200_000_000 COLLA]--> lessor_collateral_account
+     collateral_vault program-derived address --[200_000_000 collateral]--> lessor_collateral_account
      ```
    - Both vaults close; Lease closes.
-   - `last_paid_ts = min(now, end_ts) = end_ts` (step added in
+   - `last_paid_timestamp = min(now, end_timestamp) = end_timestamp` (step added in
      Fix 5).
 
 **Final balances:**
 
-- Lessor: 900 000 000 LEASED, 200 000 000 COLLA (the whole collateral
-  as compensation), plus three account-close refunds.
-- Lessee: 100 000 000 LEASED, −200 000 000 COLLA. They paid the whole
-  collateral and kept the leased tokens.
+- Lessor: 900 000 000 leased units, 200 000 000 collateral units (the entire
+  collateral pot as compensation), plus three account-close refunds.
+- Lessee: 100 000 000 leased units, −200 000 000 collateral units. They paid the
+  full collateral and kept the leased tokens.
 
 ### 4.5 Default / expiry path — `close_expired` on a `Listed` lease
 
@@ -885,14 +891,14 @@ This is the cheap cancel path. No lessee ever showed up.
 1. `create_lease` as above.
 2. `close_expired` called by the lessor immediately.
    - `status == Listed` → no expiry check.
-   - `leased_vault` holds 100 000 000 LEASED. Drain back:
+   - `leased_vault` holds 100 000 000 leased units. Drain back:
      ```
-     leased_vault PDA --[100_000_000 LEASED]--> lessor_leased_account
+     leased_vault program-derived address --[100_000_000 leased]--> lessor_leased_account
      ```
    - `collateral_vault` is empty. No transfer.
    - Both vaults close; Lease closes.
 
-**Final balances:** lessor is back to 1 000 000 000 LEASED; nothing
+**Final balances:** lessor is back to 1 000 000 000 leased units; nothing
 else moved.
 
 ---
@@ -912,10 +918,10 @@ handler:
 | `InvalidLeasedAmount` | `leased_amount == 0` on `create_lease` |
 | `InvalidCollateralAmount` | `required_collateral_amount == 0` on `create_lease`; `amount == 0` on `top_up_collateral` |
 | `InvalidLeaseFeePerSecond` | `lease_fee_per_second == 0` on `create_lease` |
-| `InvalidMaintenanceMargin` | `maintenance_margin_bps == 0` or `> 50_000` on `create_lease` |
-| `InvalidLiquidationBounty` | `liquidation_bounty_bps > 2_000` on `create_lease` |
-| `LeaseExpired` | Reserved; not currently used (Lease fee accrual naturally caps at `end_ts`) |
-| `LeaseNotExpired` | `close_expired` called on an `Active` lease before `end_ts` |
+| `InvalidMaintenanceMargin` | `maintenance_margin_basis_points == 0` or `> 50_000` on `create_lease` |
+| `InvalidLiquidationBounty` | `liquidation_bounty_basis_points > 2_000` on `create_lease` |
+| `LeaseExpired` | Reserved; not currently used (Lease fee accrual naturally caps at `end_timestamp`) |
+| `LeaseNotExpired` | `close_expired` called on an `Active` lease before `end_timestamp` |
 | `PositionHealthy` | `liquidate` called on a lease that passes the maintenance-margin check |
 | `StalePrice` | Pyth price update older than 60 s, or has a future `publish_time`, or fails discriminator / length check |
 | `NonPositivePrice` | Pyth price is `<= 0` |
@@ -959,7 +965,7 @@ handler:
 
 - **Max maintenance margin = 500%.** Without an upper bound a lessor
   could set a margin that is unreachable on day one and liquidate the
-  lessee instantly. 50 000 bps is generous — enough for truly
+  lessee instantly. 50 000 basis points is generous — enough for truly
   speculative leases — while still blocking the pathological 10 000×
   trap.
 
@@ -985,12 +991,12 @@ A production protocol would want more:
   units per second of `lease_fee_per_second`. Choose a small
   `lease_fee_per_second` and short-lived leases can settle 0 lease
   fees if no-one calls `pay_lease_fee` for a very short period. Not a
-  security issue — the accrual ts only moves forward when the lease
+  security issue — the accrual timestamp only moves forward when the lease
   fee is actually settled — but worth knowing.
 
 - **Griefing on `init_if_needed`.** `take_lease`, `pay_lease_fee`,
   `liquidate`, `return_lease` and `close_expired` all do
-  `init_if_needed` on one or more ATAs. If the caller does not fund
+  `init_if_needed` on one or more associated token accounts. If the caller does not fund
   the rent-exempt reserve for those accounts, the transaction fails.
   This is the intended behaviour (the caller pays for the state they
   require) but can surprise a lessee on a tight SOL budget.
@@ -998,7 +1004,7 @@ A production protocol would want more:
 - **No partial lease-fee refund on default.** When `close_expired` runs on
   an `Active` lease, the lessor takes the entire collateral regardless
   of how many lease fees had actually accrued by then. This is a deliberate
-  simplification — the `last_paid_ts` bookkeeping in Fix 5 is in
+  simplification — the `last_paid_timestamp` bookkeeping in Fix 5 is in
   place precisely so a future version can split the pot correctly.
 
 - **No pause / upgrade authority.** The program has no admin and no
@@ -1041,7 +1047,7 @@ Expected output:
 ```
 running 11 tests
 test close_expired_cancels_listed_lease ... ok
-test close_expired_reclaims_collateral_after_end_ts ... ok
+test close_expired_reclaims_collateral_after_end_timestamp ... ok
 test create_lease_locks_tokens_and_lists ... ok
 test create_lease_rejects_same_mint_for_leased_and_collateral ... ok
 test liquidate_rejects_healthy_position ... ok
@@ -1059,14 +1065,14 @@ test top_up_collateral_increases_vault_balance ... ok
 |---|---|
 | `create_lease_locks_tokens_and_lists` | Lessor funds vault, `Lease` created, collateral vault empty |
 | `create_lease_rejects_same_mint_for_leased_and_collateral` | Guard against `leased_mint == collateral_mint` |
-| `take_lease_posts_collateral_and_delivers_tokens` | Collateral deposit + leased-token payout in one ix |
+| `take_lease_posts_collateral_and_delivers_tokens` | Collateral deposit + leased-token payout in one instruction |
 | `pay_lease_fee_streams_collateral_by_elapsed_time` | Lease fee math: `elapsed * lease_fee_per_second`, lease fee transferred to lessor |
 | `top_up_collateral_increases_vault_balance` | Collateral balance after `top_up` equals deposit + top-up |
 | `return_lease_refunds_unused_collateral` | Happy path round-trip — leased tokens returned, residual collateral refunded, accounts closed |
 | `liquidate_seizes_collateral_on_price_drop` | Price-induced underwater position → lease fee + bounty + lessor share paid, accounts closed |
 | `liquidate_rejects_healthy_position` | Program refuses to liquidate a position that passes the margin check |
 | `liquidate_rejects_mismatched_price_feed` | Program refuses a `PriceUpdateV2` whose `feed_id` ≠ `lease.feed_id` |
-| `close_expired_reclaims_collateral_after_end_ts` | Default path — lessor seizes the collateral |
+| `close_expired_reclaims_collateral_after_end_timestamp` | Default path — lessor seizes the collateral |
 | `close_expired_cancels_listed_lease` | Lessor-initiated cancel of an unrented lease |
 
 ### Note on CI
@@ -1089,7 +1095,7 @@ Anchor that compiles to bare Solana program binaries without pulling in
 size, or simply want fewer layers between your code and the runtime.
 
 The port implements the same seven instruction handlers, the same
-`Lease` state account, the same PDA seed conventions, and produces the
+`Lease` state account, the same program-derived address seed conventions, and produces the
 same on-chain behaviour for every happy-path and adversarial test in
 this README.
 
@@ -1135,13 +1141,13 @@ The Quasar example in this repo's CI workflow
   means the setup code is more explicit.
 
 - **No cross-program-invocation into an associated-token-account
-  program for ATA creation.** The Anchor version uses `init_if_needed`
+  program for associated token account creation.** The Anchor version uses `init_if_needed`
   + `associated_token::...` to let callers pass in a lessor/lessee
   wallet and get the token account created on demand. The Quasar port
   accepts pre-created token accounts for the user side of every flow,
-  since doing `init_if_needed` correctly for ATAs in Quasar requires
-  wiring in the ATA program manually and adds noise that distracts
-  from the lease mechanics. Production code would want the ATA
+  since doing `init_if_needed` correctly for associated token accounts in Quasar requires
+  wiring in the associated token account program manually and adds noise that distracts
+  from the lease mechanics. Production code would want the associated token account
   convenience back.
 
 - **Classic Token only, not Token-2022.** The Anchor version declares
@@ -1158,16 +1164,16 @@ The Quasar example in this repo's CI workflow
   Quasar ones after adjusting for the one-byte discriminator.
 
 - **One lease per lessor at a time.** The Anchor version keys its
-  `Lease` PDA on `[LEASE_SEED, lessor, lease_id]` so one lessor can
+  `Lease` program-derived address on `[LEASE_SEED, lessor, lease_id]` so one lessor can
   run many leases in parallel. Quasar's `seeds = [...]` macro embeds
   raw references into generated code and does not (yet) have a
   borrow-safe way to splice instruction args like
   `lease_id.to_le_bytes()` into the seed list, so the Quasar port
-  keys its PDA on `[LEASE_SEED, lessor]` alone — one active lease per
+  keys its program-derived address on `[LEASE_SEED, lessor]` alone — one active lease per
   lessor. The `lease_id` is still stored on the `Lease` account for
   book-keeping and is a caller-supplied u64 in `create_lease`; the
   off-chain client just has to ensure the previous lease from the same
-  lessor is `Closed` or `Liquidated` (i.e. its PDA account is gone)
+  lessor is `Closed` or `Liquidated` (i.e. its program-derived address account is gone)
   before creating a new one. Swapping in a multi-lease seed is a
   mechanical change once Quasar grows support for dynamic-byte seeds.
 
@@ -1185,7 +1191,7 @@ Directions a real protocol would consider, grouped by effort:
 ### Easy
 
 - **Add a `lease_view` read-only helper.** An off-chain indexer-style
-  struct that returns `{ collateral_value, debt_value, ratio_bps,
+  struct that returns `{ collateral_value, debt_value, ratio_basis_points,
   is_underwater }` given the same inputs `is_underwater` uses. Useful
   for UIs that want to show "you are 15% away from liquidation".
 
@@ -1200,7 +1206,7 @@ Directions a real protocol would consider, grouped by effort:
 - **Partial-refund default.** In `close_expired` on `Active`, instead
   of giving the lessor the entire collateral, split it:
   `lease_fee_due` to the lessor, the rest stays with the lessee up to some
-  `default_haircut_bps`. `last_paid_ts` is already bumped by
+  `default_haircut_basis_points`. `last_paid_timestamp` is already bumped by
   Fix 5, so the timestamp invariants are ready.
 
 - **Multiple outstanding leases per `(lessor, lessee)` pair with the
@@ -1217,7 +1223,7 @@ Directions a real protocol would consider, grouped by effort:
 
 ### Harder
 
-- **Keeper auction.** Replace the fixed `liquidation_bounty_bps` with a
+- **Keeper auction.** Replace the fixed `liquidation_bounty_basis_points` with a
   Dutch auction that grows the bounty linearly over some window after
   the position first becomes underwater. Keeps liquidators honest on
   tight feeds and gives lessees a chance to `top_up_collateral` before
@@ -1247,7 +1253,7 @@ defi/asset-leasing/anchor/
 └── programs/asset-leasing/
     ├── Cargo.toml
     ├── src/
-    │   ├── constants.rs    PDA seeds, bps limits, Pyth age cap
+    │   ├── constants.rs    program-derived address seeds, basis points limits, Pyth age cap
     │   ├── errors.rs
     │   ├── lib.rs          #[program] entry points
     │   ├── instructions/

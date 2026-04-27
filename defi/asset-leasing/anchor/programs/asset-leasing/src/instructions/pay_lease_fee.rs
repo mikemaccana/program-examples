@@ -19,7 +19,7 @@ pub struct PayLeaseFee<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: Referenced only for PDA derivation + has_one check on `lease`.
+    /// CHECK: Referenced only for program-derived address derivation + has_one check on `lease`.
     pub lessor: UncheckedAccount<'info>,
 
     #[account(
@@ -44,7 +44,7 @@ pub struct PayLeaseFee<'info> {
     )]
     pub collateral_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessor's collateral-mint ATA, created on demand so the lessor does not
+    /// Lessor's collateral-mint associated token account, created on demand so the lessor does not
     /// need to pre-fund it with the lease fee.
     #[account(
         init_if_needed,
@@ -65,9 +65,9 @@ pub fn handle_pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
 
     let lease_fee_amount = compute_lease_fee_due(&context.accounts.lease, now)?;
 
-    // No time has passed (or already capped at end_ts). Nothing to do.
+    // No time has passed (or already capped at end_timestamp). Nothing to do.
     if lease_fee_amount == 0 {
-        update_last_paid_ts(&mut context.accounts.lease, now);
+        update_last_paid_timestamp(&mut context.accounts.lease, now);
         return Ok(());
     }
 
@@ -104,28 +104,28 @@ pub fn handle_pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
             .ok_or(AssetLeasingError::MathOverflow)?;
     }
 
-    update_last_paid_ts(&mut context.accounts.lease, now);
+    update_last_paid_timestamp(&mut context.accounts.lease, now);
     Ok(())
 }
 
-/// Lease fee accrues linearly: `(min(now, end_ts) - last_paid_ts) * rate`.
+/// Lease fee accrues linearly: `(min(now, end_timestamp) - last_paid_timestamp) * rate`.
 /// Extracted so it can be re-used by `return_lease` and `liquidate` for a
 /// final settlement before closing the lease.
 pub fn compute_lease_fee_due(lease: &Lease, now: i64) -> Result<u64> {
-    let cutoff = now.min(lease.end_ts);
-    if cutoff <= lease.last_paid_ts {
+    let cutoff = now.min(lease.end_timestamp);
+    if cutoff <= lease.last_paid_timestamp {
         return Ok(0);
     }
-    let elapsed = (cutoff - lease.last_paid_ts) as u64;
+    let elapsed = (cutoff - lease.last_paid_timestamp) as u64;
     elapsed
         .checked_mul(lease.lease_fee_per_second)
         .ok_or(AssetLeasingError::MathOverflow.into())
 }
 
-/// Advance `last_paid_ts` but never past the lease end — after end_ts
+/// Advance `last_paid_timestamp` but never past the lease end — after end_timestamp
 /// the lease is settled and extra Lease fees do not accrue.
-pub fn update_last_paid_ts(lease: &mut Lease, now: i64) {
-    lease.last_paid_ts = now.min(lease.end_ts);
+pub fn update_last_paid_timestamp(lease: &mut Lease, now: i64) {
+    lease.last_paid_timestamp = now.min(lease.end_timestamp);
 }
 
 impl<'info> PayLeaseFee<'info> {

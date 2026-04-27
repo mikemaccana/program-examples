@@ -6,7 +6,7 @@ use anchor_spl::{
 
 use crate::{
     constants::{
-        BPS_DENOMINATOR, COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED,
+        BASIS_POINTS_DENOMINATOR, COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED,
         PYTH_MAX_AGE_SECONDS,
     },
     errors::AssetLeasingError,
@@ -34,7 +34,7 @@ pub struct Liquidate<'info> {
     #[account(mut)]
     pub keeper: Signer<'info>,
 
-    /// CHECK: PDA seed + lease-fee / collateral destination.
+    /// CHECK: program-derived address seed + lease-fee / collateral destination.
     #[account(mut)]
     pub lessor: UncheckedAccount<'info>,
 
@@ -174,7 +174,7 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         AssetLeasingError::PositionHealthy
     );
 
-    // Settle accrued lease fees first (up to end_ts) so the lessor is paid for the
+    // Settle accrued lease fees first (up to end_timestamp) so the lessor is paid for the
     // time the lessee actually used. Only then slice off bounty + remainder.
     let lease_fee_due = compute_lease_fee_due(&context.accounts.lease, now)?;
     let lease_fee_payable = lease_fee_due.min(context.accounts.lease.collateral_amount);
@@ -215,9 +215,9 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     // Bounty is a percentage of the collateral *after* lease fees — guarantees we
     // never try to pay out more than what actually sits in the vault.
     let bounty = (remaining as u128)
-        .checked_mul(context.accounts.lease.liquidation_bounty_bps as u128)
+        .checked_mul(context.accounts.lease.liquidation_bounty_basis_points as u128)
         .ok_or(AssetLeasingError::MathOverflow)?
-        .checked_div(BPS_DENOMINATOR as u128)
+        .checked_div(BASIS_POINTS_DENOMINATOR as u128)
         .ok_or(AssetLeasingError::MathOverflow)? as u64;
 
     if bounty > 0 {
@@ -264,7 +264,7 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     )?;
 
     context.accounts.lease.collateral_amount = 0;
-    context.accounts.lease.last_paid_ts = now.min(context.accounts.lease.end_ts);
+    context.accounts.lease.last_paid_timestamp = now.min(context.accounts.lease.end_timestamp);
     context.accounts.lease.status = LeaseStatus::Liquidated;
 
     Ok(())
@@ -285,8 +285,8 @@ pub fn is_underwater(lease: &Lease, price: &DecodedPriceUpdate, now: i64) -> Res
 
     let leased_amount = lease.leased_amount as u128;
     let collateral_amount = lease.collateral_amount as u128;
-    let margin_bps = lease.maintenance_margin_bps as u128;
-    let denom = BPS_DENOMINATOR as u128;
+    let margin_basis_points = lease.maintenance_margin_basis_points as u128;
+    let denom = BASIS_POINTS_DENOMINATOR as u128;
 
     let (collateral_scaled, debt_scaled) = if price.exponent >= 0 {
         let scale = ten_pow(price.exponent as u32)?;
@@ -310,7 +310,7 @@ pub fn is_underwater(lease: &Lease, price: &DecodedPriceUpdate, now: i64) -> Res
         .checked_mul(denom)
         .ok_or(AssetLeasingError::MathOverflow)?;
     let rhs = debt_scaled
-        .checked_mul(margin_bps)
+        .checked_mul(margin_basis_points)
         .ok_or(AssetLeasingError::MathOverflow)?;
 
     Ok(lhs < rhs)

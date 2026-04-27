@@ -17,7 +17,7 @@ pub struct TakeLease<'info> {
     pub lessee: &'info Signer,
 
     /// Pubkey of the lessor who created the lease. Referenced only for
-    /// `Lease` PDA derivation and the `has_one` check below.
+    /// `Lease` program-derived address derivation and the `has_one` check below.
     pub lessor: &'info UncheckedAccount,
 
     #[account(
@@ -82,7 +82,7 @@ pub fn handle_take_lease(accounts: &mut TakeLease) -> Result<(), ProgramError> {
         )
         .invoke()?;
 
-    // Pay out leased tokens from the vault PDA. Signer seeds reproduce the
+    // Pay out leased tokens from the vault program-derived address. Signer seeds reproduce the
     // vault's derivation: [LEASED_VAULT_SEED, lease, bump].
     let leased_vault_bump = [accounts.lease.leased_vault_bump];
     let lease_address = *accounts.lease.address();
@@ -101,16 +101,16 @@ pub fn handle_take_lease(accounts: &mut TakeLease) -> Result<(), ProgramError> {
         )
         .invoke_signed(vault_seeds)?;
 
-    let end_ts = now
+    let end_timestamp = now
         .checked_add(duration_seconds)
         .ok_or(AssetLeasingError::MathOverflow)?;
 
     let lease = &mut accounts.lease;
     lease.lessee = *accounts.lessee.address();
     lease.collateral_amount = required_collateral_amount.into();
-    lease.start_ts = now.into();
-    lease.end_ts = end_ts.into();
-    lease.last_paid_ts = now.into();
+    lease.start_timestamp = now.into();
+    lease.end_timestamp = end_timestamp.into();
+    lease.last_paid_timestamp = now.into();
     lease.status = LeaseStatus::Active as u8;
 
     Ok(())

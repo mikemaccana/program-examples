@@ -41,21 +41,21 @@ fn token_program_id() -> Pubkey {
         .unwrap()
 }
 
-fn ata_program_id() -> Pubkey {
+fn associated_token_account_program_id() -> Pubkey {
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         .parse()
         .unwrap()
 }
 
-fn derive_ata(wallet: &Pubkey, mint: &Pubkey) -> Pubkey {
-    let (ata, _bump) = Pubkey::find_program_address(
+fn derive_associated_token_account(wallet: &Pubkey, mint: &Pubkey) -> Pubkey {
+    let (associated_token_account, _bump) = Pubkey::find_program_address(
         &[wallet.as_ref(), token_program_id().as_ref(), mint.as_ref()],
-        &ata_program_id(),
+        &associated_token_account_program_id(),
     );
-    ata
+    associated_token_account
 }
 
-fn lease_pdas(program_id: &Pubkey, lessor: &Pubkey, lease_id: u64) -> (Pubkey, Pubkey, Pubkey) {
+fn lease_program_derived_addresses(program_id: &Pubkey, lessor: &Pubkey, lease_id: u64) -> (Pubkey, Pubkey, Pubkey) {
     let (lease, _) = Pubkey::find_program_address(
         &[LEASE_SEED, lessor.as_ref(), &lease_id.to_le_bytes()],
         program_id,
@@ -70,7 +70,7 @@ fn lease_pdas(program_id: &Pubkey, lessor: &Pubkey, lease_id: u64) -> (Pubkey, P
 struct Scenario {
     svm: LiteSVM,
     program_id: Pubkey,
-    // `payer` funds the mint authority + ATA creations during setup but is
+    // `payer` funds the mint authority + associated token account creations during setup but is
     // not used directly by the tests afterwards.
     #[allow(dead_code)]
     payer: Keypair,
@@ -79,8 +79,8 @@ struct Scenario {
     keeper: Keypair,
     leased_mint: Pubkey,
     collateral_mint: Pubkey,
-    lessor_leased_ata: Pubkey,
-    lessee_collateral_ata: Pubkey,
+    lessor_leased_associated_token_account: Pubkey,
+    lessee_collateral_associated_token_account: Pubkey,
 }
 
 fn full_setup() -> Scenario {
@@ -99,31 +99,31 @@ fn full_setup() -> Scenario {
     let leased_mint = create_token_mint(&mut svm, &payer, decimals, None).unwrap();
     let collateral_mint = create_token_mint(&mut svm, &payer, decimals, None).unwrap();
 
-    let lessor_leased_ata =
+    let lessor_leased_associated_token_account =
         create_associated_token_account(&mut svm, &lessor.pubkey(), &leased_mint, &payer).unwrap();
     mint_tokens_to_token_account(
         &mut svm,
         &leased_mint,
-        &lessor_leased_ata,
+        &lessor_leased_associated_token_account,
         1_000_000_000,
         &payer,
     )
     .unwrap();
 
-    let lessee_collateral_ata =
+    let lessee_collateral_associated_token_account =
         create_associated_token_account(&mut svm, &lessee.pubkey(), &collateral_mint, &payer)
             .unwrap();
     mint_tokens_to_token_account(
         &mut svm,
         &collateral_mint,
-        &lessee_collateral_ata,
+        &lessee_collateral_associated_token_account,
         1_000_000_000,
         &payer,
     )
     .unwrap();
 
     // Anchor macros init the Lease + vault accounts — LiteSVM's default clock
-    // is epoch 0 which makes the first `take_lease` have start_ts=0 and look
+    // is epoch 0 which makes the first `take_lease` have start_timestamp=0 and look
     // identical to a Listed lease. Advance once so lease fee math has signal.
     advance_clock_to(&mut svm, 1_700_000_000);
 
@@ -136,8 +136,8 @@ fn full_setup() -> Scenario {
         keeper,
         leased_mint,
         collateral_mint,
-        lessor_leased_ata,
-        lessee_collateral_ata,
+        lessor_leased_associated_token_account,
+        lessee_collateral_associated_token_account,
     }
 }
 
@@ -162,37 +162,37 @@ fn current_clock(svm: &LiteSVM) -> i64 {
 // ---------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
-fn build_create_lease_ix(
-    sc: &Scenario,
+fn build_create_lease_instruction(
+    scenario: &Scenario,
     lease_id: u64,
     leased_amount: u64,
     required_collateral_amount: u64,
     lease_fee_per_second: u64,
     duration_seconds: i64,
-    maintenance_margin_bps: u16,
-    liquidation_bounty_bps: u16,
+    maintenance_margin_basis_points: u16,
+    liquidation_bounty_basis_points: u16,
     feed_id: [u8; 32],
 ) -> Instruction {
     let (lease, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::CreateLease {
             lease_id,
             leased_amount,
             required_collateral_amount,
             lease_fee_per_second,
             duration_seconds,
-            maintenance_margin_bps,
-            liquidation_bounty_bps,
+            maintenance_margin_basis_points,
+            liquidation_bounty_basis_points,
             feed_id,
         }
         .data(),
         asset_leasing::accounts::CreateLease {
-            lessor: sc.lessor.pubkey(),
-            leased_mint: sc.leased_mint,
-            collateral_mint: sc.collateral_mint,
-            lessor_leased_account: sc.lessor_leased_ata,
+            lessor: scenario.lessor.pubkey(),
+            leased_mint: scenario.leased_mint,
+            collateral_mint: scenario.collateral_mint,
+            lessor_leased_account: scenario.lessor_leased_associated_token_account,
             lease,
             leased_vault,
             collateral_vault,
@@ -203,145 +203,145 @@ fn build_create_lease_ix(
     )
 }
 
-fn build_take_lease_ix(sc: &Scenario, lease_id: u64) -> Instruction {
+fn build_take_lease_instruction(scenario: &Scenario, lease_id: u64) -> Instruction {
     let (lease, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let lessee_leased_ata = derive_ata(&sc.lessee.pubkey(), &sc.leased_mint);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let lessee_leased_associated_token_account = derive_associated_token_account(&scenario.lessee.pubkey(), &scenario.leased_mint);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::TakeLease {}.data(),
         asset_leasing::accounts::TakeLease {
-            lessee: sc.lessee.pubkey(),
-            lessor: sc.lessor.pubkey(),
+            lessee: scenario.lessee.pubkey(),
+            lessor: scenario.lessor.pubkey(),
             lease,
-            leased_mint: sc.leased_mint,
-            collateral_mint: sc.collateral_mint,
+            leased_mint: scenario.leased_mint,
+            collateral_mint: scenario.collateral_mint,
             leased_vault,
             collateral_vault,
-            lessee_collateral_account: sc.lessee_collateral_ata,
-            lessee_leased_account: lessee_leased_ata,
+            lessee_collateral_account: scenario.lessee_collateral_associated_token_account,
+            lessee_leased_account: lessee_leased_associated_token_account,
             token_program: token_program_id(),
-            associated_token_program: ata_program_id(),
+            associated_token_program: associated_token_account_program_id(),
             system_program: system_program::id(),
         }
         .to_account_metas(None),
     )
 }
 
-fn build_pay_lease_fee_ix(sc: &Scenario, lease_id: u64) -> Instruction {
+fn build_pay_lease_fee_instruction(scenario: &Scenario, lease_id: u64) -> Instruction {
     let (lease, _leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::PayLeaseFee {}.data(),
         asset_leasing::accounts::PayLeaseFee {
-            payer: sc.lessee.pubkey(),
-            lessor: sc.lessor.pubkey(),
+            payer: scenario.lessee.pubkey(),
+            lessor: scenario.lessor.pubkey(),
             lease,
-            collateral_mint: sc.collateral_mint,
+            collateral_mint: scenario.collateral_mint,
             collateral_vault,
-            lessor_collateral_account: lessor_collateral_ata,
+            lessor_collateral_account: lessor_collateral_associated_token_account,
             token_program: token_program_id(),
-            associated_token_program: ata_program_id(),
+            associated_token_program: associated_token_account_program_id(),
             system_program: system_program::id(),
         }
         .to_account_metas(None),
     )
 }
 
-fn build_top_up_ix(sc: &Scenario, lease_id: u64, amount: u64) -> Instruction {
+fn build_top_up_instruction(scenario: &Scenario, lease_id: u64, amount: u64) -> Instruction {
     let (lease, _leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::TopUpCollateral { amount }.data(),
         asset_leasing::accounts::TopUpCollateral {
-            lessee: sc.lessee.pubkey(),
-            lessor: sc.lessor.pubkey(),
+            lessee: scenario.lessee.pubkey(),
+            lessor: scenario.lessor.pubkey(),
             lease,
-            collateral_mint: sc.collateral_mint,
+            collateral_mint: scenario.collateral_mint,
             collateral_vault,
-            lessee_collateral_account: sc.lessee_collateral_ata,
+            lessee_collateral_account: scenario.lessee_collateral_associated_token_account,
             token_program: token_program_id(),
         }
         .to_account_metas(None),
     )
 }
 
-fn build_return_lease_ix(sc: &Scenario, lease_id: u64) -> Instruction {
+fn build_return_lease_instruction(scenario: &Scenario, lease_id: u64) -> Instruction {
     let (lease, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let lessee_leased_ata = derive_ata(&sc.lessee.pubkey(), &sc.leased_mint);
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let lessee_leased_associated_token_account = derive_associated_token_account(&scenario.lessee.pubkey(), &scenario.leased_mint);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::ReturnLease {}.data(),
         asset_leasing::accounts::ReturnLease {
-            lessee: sc.lessee.pubkey(),
-            lessor: sc.lessor.pubkey(),
+            lessee: scenario.lessee.pubkey(),
+            lessor: scenario.lessor.pubkey(),
             lease,
-            leased_mint: sc.leased_mint,
-            collateral_mint: sc.collateral_mint,
+            leased_mint: scenario.leased_mint,
+            collateral_mint: scenario.collateral_mint,
             leased_vault,
             collateral_vault,
-            lessee_leased_account: lessee_leased_ata,
-            lessee_collateral_account: sc.lessee_collateral_ata,
-            lessor_leased_account: sc.lessor_leased_ata,
-            lessor_collateral_account: lessor_collateral_ata,
+            lessee_leased_account: lessee_leased_associated_token_account,
+            lessee_collateral_account: scenario.lessee_collateral_associated_token_account,
+            lessor_leased_account: scenario.lessor_leased_associated_token_account,
+            lessor_collateral_account: lessor_collateral_associated_token_account,
             token_program: token_program_id(),
-            associated_token_program: ata_program_id(),
+            associated_token_program: associated_token_account_program_id(),
             system_program: system_program::id(),
         }
         .to_account_metas(None),
     )
 }
 
-fn build_liquidate_ix(sc: &Scenario, lease_id: u64, price_update: Pubkey) -> Instruction {
+fn build_liquidate_instruction(scenario: &Scenario, lease_id: u64, price_update: Pubkey) -> Instruction {
     let (lease, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
-    let keeper_collateral_ata = derive_ata(&sc.keeper.pubkey(), &sc.collateral_mint);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
+    let keeper_collateral_associated_token_account = derive_associated_token_account(&scenario.keeper.pubkey(), &scenario.collateral_mint);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::Liquidate {}.data(),
         asset_leasing::accounts::Liquidate {
-            keeper: sc.keeper.pubkey(),
-            lessor: sc.lessor.pubkey(),
+            keeper: scenario.keeper.pubkey(),
+            lessor: scenario.lessor.pubkey(),
             lease,
-            leased_mint: sc.leased_mint,
-            collateral_mint: sc.collateral_mint,
+            leased_mint: scenario.leased_mint,
+            collateral_mint: scenario.collateral_mint,
             leased_vault,
             collateral_vault,
-            lessor_collateral_account: lessor_collateral_ata,
-            keeper_collateral_account: keeper_collateral_ata,
+            lessor_collateral_account: lessor_collateral_associated_token_account,
+            keeper_collateral_account: keeper_collateral_associated_token_account,
             price_update,
             token_program: token_program_id(),
-            associated_token_program: ata_program_id(),
+            associated_token_program: associated_token_account_program_id(),
             system_program: system_program::id(),
         }
         .to_account_metas(None),
     )
 }
 
-fn build_close_expired_ix(sc: &Scenario, lease_id: u64) -> Instruction {
+fn build_close_expired_instruction(scenario: &Scenario, lease_id: u64) -> Instruction {
     let (lease, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
     Instruction::new_with_bytes(
-        sc.program_id,
+        scenario.program_id,
         &asset_leasing::instruction::CloseExpired {}.data(),
         asset_leasing::accounts::CloseExpired {
-            lessor: sc.lessor.pubkey(),
+            lessor: scenario.lessor.pubkey(),
             lease,
-            leased_mint: sc.leased_mint,
-            collateral_mint: sc.collateral_mint,
+            leased_mint: scenario.leased_mint,
+            collateral_mint: scenario.collateral_mint,
             leased_vault,
             collateral_vault,
-            lessor_leased_account: sc.lessor_leased_ata,
-            lessor_collateral_account: lessor_collateral_ata,
+            lessor_leased_account: scenario.lessor_leased_associated_token_account,
+            lessor_collateral_account: lessor_collateral_associated_token_account,
             token_program: token_program_id(),
-            associated_token_program: ata_program_id(),
+            associated_token_program: associated_token_account_program_id(),
             system_program: system_program::id(),
         }
         .to_account_metas(None),
@@ -410,12 +410,12 @@ fn mock_price_update(
 // ---------------------------------------------------------------------------
 
 // Shared lease parameters so the sanity assertions line up across tests.
-const LEASED_AMOUNT: u64 = 100_000_000; // 100 "leased" tokens (6 dp)
+const LEASED_AMOUNT: u64 = 100_000_000; // 100 "leased" tokens (6 decimal places)
 const REQUIRED_COLLATERAL: u64 = 200_000_000; // 200 collateral tokens
 const LEASE_FEE_PER_SECOND: u64 = 10; // 10 base-units / sec
 const DURATION_SECONDS: i64 = 60 * 60 * 24; // 24h
-const MAINTENANCE_MARGIN_BPS: u16 = 12_000; // 120%
-const LIQUIDATION_BOUNTY_BPS: u16 = 500; // 5%
+const MAINTENANCE_MARGIN_BASIS_POINTS: u16 = 12_000; // 120%
+const LIQUIDATION_BOUNTY_BASIS_POINTS: u16 = 500; // 5%
 // Arbitrary 32-byte Pyth feed id the tests pin their leases to. The
 // mocked `PriceUpdateV2` accounts carry the same id so the feed-pinning
 // check in liquidate passes. `liquidate_rejects_mismatched_price_feed`
@@ -424,229 +424,229 @@ const FEED_ID: [u8; 32] = [0xAB; 32];
 
 #[test]
 fn create_lease_locks_tokens_and_lists() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
 
     let lease_id = 1u64;
-    let ix = build_create_lease_ix(
-        &sc,
+    let instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    send_transaction_from_instructions(&mut sc.svm, vec![ix], &[&sc.lessor], &sc.lessor.pubkey())
+    send_transaction_from_instructions(&mut scenario.svm, vec![instruction], &[&scenario.lessor], &scenario.lessor.pubkey())
         .unwrap();
 
-    let (lease_pda, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
+    let (lease_program_derived_address, leased_vault, collateral_vault) =
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
 
     // Leased tokens escrowed.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &leased_vault).unwrap(),
+        get_token_account_balance(&scenario.svm, &leased_vault).unwrap(),
         LEASED_AMOUNT
     );
     // Collateral vault exists but has no collateral yet.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &collateral_vault).unwrap(),
+        get_token_account_balance(&scenario.svm, &collateral_vault).unwrap(),
         0
     );
     // Lessor's leased balance dropped by the escrowed amount.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &sc.lessor_leased_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &scenario.lessor_leased_associated_token_account).unwrap(),
         1_000_000_000 - LEASED_AMOUNT
     );
 
     // Lease account exists and is owned by the program.
-    let lease_account = sc.svm.get_account(&lease_pda).expect("lease PDA missing");
-    assert_eq!(lease_account.owner, sc.program_id);
+    let lease_account = scenario.svm.get_account(&lease_program_derived_address).expect("lease program-derived address missing");
+    assert_eq!(lease_account.owner, scenario.program_id);
     assert!(!lease_account.data.is_empty());
 }
 
 #[test]
 fn take_lease_posts_collateral_and_delivers_tokens() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 2u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix],
-        &[&sc.lessor],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction],
+        &[&scenario.lessor],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![take_ix],
-        &[&sc.lessee],
-        &sc.lessee.pubkey(),
+        &mut scenario.svm,
+        vec![take_instruction],
+        &[&scenario.lessee],
+        &scenario.lessee.pubkey(),
     )
     .unwrap();
 
     let (_, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let lessee_leased_ata = derive_ata(&sc.lessee.pubkey(), &sc.leased_mint);
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let lessee_leased_associated_token_account = derive_associated_token_account(&scenario.lessee.pubkey(), &scenario.leased_mint);
 
     // Leased vault drained into the lessee.
-    assert_eq!(get_token_account_balance(&sc.svm, &leased_vault).unwrap(), 0);
+    assert_eq!(get_token_account_balance(&scenario.svm, &leased_vault).unwrap(), 0);
     assert_eq!(
-        get_token_account_balance(&sc.svm, &lessee_leased_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &lessee_leased_associated_token_account).unwrap(),
         LEASED_AMOUNT
     );
     // Collateral moved from the lessee into the collateral vault.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &collateral_vault).unwrap(),
+        get_token_account_balance(&scenario.svm, &collateral_vault).unwrap(),
         REQUIRED_COLLATERAL
     );
     assert_eq!(
-        get_token_account_balance(&sc.svm, &sc.lessee_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &scenario.lessee_collateral_associated_token_account).unwrap(),
         1_000_000_000 - REQUIRED_COLLATERAL
     );
 }
 
 #[test]
 fn pay_lease_fee_streams_collateral_by_elapsed_time() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 3u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     let elapsed: i64 = 120; // 2 minutes
-    advance_clock_by(&mut sc.svm, elapsed);
+    advance_clock_by(&mut scenario.svm, elapsed);
 
-    let pay_ix = build_pay_lease_fee_ix(&sc, lease_id);
+    let pay_instruction = build_pay_lease_fee_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![pay_ix],
-        &[&sc.lessee],
-        &sc.lessee.pubkey(),
+        &mut scenario.svm,
+        vec![pay_instruction],
+        &[&scenario.lessee],
+        &scenario.lessee.pubkey(),
     )
     .unwrap();
 
     let expected_lease_fees = (elapsed as u64) * LEASE_FEE_PER_SECOND;
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
     assert_eq!(
-        get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &lessor_collateral_associated_token_account).unwrap(),
         expected_lease_fees
     );
-    let (_, _, collateral_vault) = lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
+    let (_, _, collateral_vault) = lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
     assert_eq!(
-        get_token_account_balance(&sc.svm, &collateral_vault).unwrap(),
+        get_token_account_balance(&scenario.svm, &collateral_vault).unwrap(),
         REQUIRED_COLLATERAL - expected_lease_fees
     );
 }
 
 #[test]
 fn top_up_collateral_increases_vault_balance() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 4u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     let top_up_amount: u64 = 50_000_000;
-    let top_up_ix = build_top_up_ix(&sc, lease_id, top_up_amount);
+    let top_up_instruction = build_top_up_instruction(&scenario, lease_id, top_up_amount);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![top_up_ix],
-        &[&sc.lessee],
-        &sc.lessee.pubkey(),
+        &mut scenario.svm,
+        vec![top_up_instruction],
+        &[&scenario.lessee],
+        &scenario.lessee.pubkey(),
     )
     .unwrap();
 
-    let (_, _, collateral_vault) = lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
+    let (_, _, collateral_vault) = lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
     assert_eq!(
-        get_token_account_balance(&sc.svm, &collateral_vault).unwrap(),
+        get_token_account_balance(&scenario.svm, &collateral_vault).unwrap(),
         REQUIRED_COLLATERAL + top_up_amount
     );
 }
 
 #[test]
 fn return_lease_refunds_unused_collateral() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 5u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     // Lessee returns early — 10 minutes in, for a 24h lease.
     let elapsed: i64 = 600;
-    advance_clock_by(&mut sc.svm, elapsed);
+    advance_clock_by(&mut scenario.svm, elapsed);
 
-    let return_ix = build_return_lease_ix(&sc, lease_id);
+    let return_instruction = build_return_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![return_ix],
-        &[&sc.lessee],
-        &sc.lessee.pubkey(),
+        &mut scenario.svm,
+        vec![return_instruction],
+        &[&scenario.lessee],
+        &scenario.lessee.pubkey(),
     )
     .unwrap();
 
@@ -655,66 +655,66 @@ fn return_lease_refunds_unused_collateral() {
 
     // Lessor got their leased tokens back.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &sc.lessor_leased_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &scenario.lessor_leased_associated_token_account).unwrap(),
         1_000_000_000
     );
     // Lessor also received the accrued lease fees.
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
     assert_eq!(
-        get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &lessor_collateral_associated_token_account).unwrap(),
         lease_fee_paid
     );
     // Lessee got the unused-time portion of their collateral back.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &sc.lessee_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &scenario.lessee_collateral_associated_token_account).unwrap(),
         1_000_000_000 - REQUIRED_COLLATERAL + refund_expected
     );
 
-    // Lease + vault PDAs are closed.
-    let (lease_pda, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    assert!(sc.svm.get_account(&lease_pda).is_none());
-    assert!(sc.svm.get_account(&leased_vault).is_none());
-    assert!(sc.svm.get_account(&collateral_vault).is_none());
+    // Lease + vault program-derived addresses are closed.
+    let (lease_program_derived_address, leased_vault, collateral_vault) =
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    assert!(scenario.svm.get_account(&lease_program_derived_address).is_none());
+    assert!(scenario.svm.get_account(&leased_vault).is_none());
+    assert!(scenario.svm.get_account(&collateral_vault).is_none());
 }
 
 #[test]
 fn liquidate_seizes_collateral_on_price_drop() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 6u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     // A bit of Lease fee accrues before the liquidation call so the handler has to
     // settle the lease fee *and* bounty on the same vault balance.
     let elapsed: i64 = 300;
-    advance_clock_by(&mut sc.svm, elapsed);
+    advance_clock_by(&mut scenario.svm, elapsed);
 
     // Install a Pyth price that quotes leased-in-collateral at 4.0 per unit
     // with exponent 0. At 100 leased units the debt is 400 collateral units
     // vs. the 200 collateral we hold — ratio 50%, well below 120% margin.
     let price_update_key = Keypair::new();
-    let now = current_clock(&sc.svm);
+    let now = current_clock(&scenario.svm);
     mock_price_update(
-        &mut sc.svm,
+        &mut scenario.svm,
         price_update_key.pubkey(),
         FEED_ID,
         4,
@@ -722,62 +722,62 @@ fn liquidate_seizes_collateral_on_price_drop() {
         now, // fresh publish_time
     );
 
-    let liq_ix = build_liquidate_ix(&sc, lease_id, price_update_key.pubkey());
+    let liq_ix = build_liquidate_instruction(&scenario, lease_id, price_update_key.pubkey());
     send_transaction_from_instructions(
-        &mut sc.svm,
+        &mut scenario.svm,
         vec![liq_ix],
-        &[&sc.keeper],
-        &sc.keeper.pubkey(),
+        &[&scenario.keeper],
+        &scenario.keeper.pubkey(),
     )
     .unwrap();
 
     let lease_fee_paid = (elapsed as u64) * LEASE_FEE_PER_SECOND;
     let remaining_after_lease_fees = REQUIRED_COLLATERAL - lease_fee_paid;
-    let bounty = remaining_after_lease_fees * (LIQUIDATION_BOUNTY_BPS as u64) / 10_000;
+    let bounty = remaining_after_lease_fees * (LIQUIDATION_BOUNTY_BASIS_POINTS as u64) / 10_000;
     let lessor_share = remaining_after_lease_fees - bounty;
 
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
-    let keeper_collateral_ata = derive_ata(&sc.keeper.pubkey(), &sc.collateral_mint);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
+    let keeper_collateral_associated_token_account = derive_associated_token_account(&scenario.keeper.pubkey(), &scenario.collateral_mint);
 
     assert_eq!(
-        get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &lessor_collateral_associated_token_account).unwrap(),
         lease_fee_paid + lessor_share
     );
     assert_eq!(
-        get_token_account_balance(&sc.svm, &keeper_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &keeper_collateral_associated_token_account).unwrap(),
         bounty
     );
 
     // Vaults and lease account closed.
-    let (lease_pda, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    assert!(sc.svm.get_account(&lease_pda).is_none());
-    assert!(sc.svm.get_account(&leased_vault).is_none());
-    assert!(sc.svm.get_account(&collateral_vault).is_none());
+    let (lease_program_derived_address, leased_vault, collateral_vault) =
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    assert!(scenario.svm.get_account(&lease_program_derived_address).is_none());
+    assert!(scenario.svm.get_account(&leased_vault).is_none());
+    assert!(scenario.svm.get_account(&collateral_vault).is_none());
 }
 
 #[test]
 fn liquidate_rejects_healthy_position() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 7u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
@@ -785,15 +785,15 @@ fn liquidate_rejects_healthy_position() {
     // = 200 → ratio 200% ≥ 120% maintenance margin. Expect the transaction
     // to fail with `PositionHealthy`.
     let price_update_key = Keypair::new();
-    let now = current_clock(&sc.svm);
-    mock_price_update(&mut sc.svm, price_update_key.pubkey(), FEED_ID, 1, 0, now);
+    let now = current_clock(&scenario.svm);
+    mock_price_update(&mut scenario.svm, price_update_key.pubkey(), FEED_ID, 1, 0, now);
 
-    let liq_ix = build_liquidate_ix(&sc, lease_id, price_update_key.pubkey());
+    let liq_ix = build_liquidate_instruction(&scenario, lease_id, price_update_key.pubkey());
     let result = send_transaction_from_instructions(
-        &mut sc.svm,
+        &mut scenario.svm,
         vec![liq_ix],
-        &[&sc.keeper],
-        &sc.keeper.pubkey(),
+        &[&scenario.keeper],
+        &scenario.keeper.pubkey(),
     );
     assert!(result.is_err(), "healthy liquidation must fail");
 }
@@ -804,26 +804,26 @@ fn liquidate_rejects_mismatched_price_feed() {
     // internal feed_id is different. Even when the price would push the
     // position underwater, the liquidate call must bail with
     // `PriceFeedMismatch` before running the undercollateralisation check.
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 100u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
@@ -834,9 +834,9 @@ fn liquidate_rejects_mismatched_price_feed() {
     // same as `liquidate_seizes_collateral_on_price_drop`) — except this
     // update carries the wrong feed id.
     let price_update_key = Keypair::new();
-    let now = current_clock(&sc.svm);
+    let now = current_clock(&scenario.svm);
     mock_price_update(
-        &mut sc.svm,
+        &mut scenario.svm,
         price_update_key.pubkey(),
         wrong_feed_id,
         4,
@@ -844,12 +844,12 @@ fn liquidate_rejects_mismatched_price_feed() {
         now,
     );
 
-    let liq_ix = build_liquidate_ix(&sc, lease_id, price_update_key.pubkey());
+    let liq_ix = build_liquidate_instruction(&scenario, lease_id, price_update_key.pubkey());
     let result = send_transaction_from_instructions(
-        &mut sc.svm,
+        &mut scenario.svm,
         vec![liq_ix],
-        &[&sc.keeper],
-        &sc.keeper.pubkey(),
+        &[&scenario.keeper],
+        &scenario.keeper.pubkey(),
     );
     let err = result.expect_err("liquidate must reject foreign price feeds");
     let rendered = format!("{err:?}");
@@ -861,106 +861,106 @@ fn liquidate_rejects_mismatched_price_feed() {
 }
 
 #[test]
-fn close_expired_reclaims_collateral_after_end_ts() {
-    let mut sc = full_setup();
+fn close_expired_reclaims_collateral_after_end_timestamp() {
+    let mut scenario = full_setup();
     let lease_id = 8u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
-    let take_ix = build_take_lease_ix(&sc, lease_id);
+    let take_instruction = build_take_lease_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix, take_ix],
-        &[&sc.lessor, &sc.lessee],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction, take_instruction],
+        &[&scenario.lessor, &scenario.lessee],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     // Jump past the lease end.
-    advance_clock_by(&mut sc.svm, DURATION_SECONDS + 1);
+    advance_clock_by(&mut scenario.svm, DURATION_SECONDS + 1);
 
-    let close_ix = build_close_expired_ix(&sc, lease_id);
+    let close_instruction = build_close_expired_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![close_ix],
-        &[&sc.lessor],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![close_instruction],
+        &[&scenario.lessor],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     // Full collateral forfeited to the lessor. Leased tokens are gone (the
     // lessee kept them on default) so the lessor's leased balance is only
     // what they had after the initial escrow minus the leased amount.
-    let lessor_collateral_ata = derive_ata(&sc.lessor.pubkey(), &sc.collateral_mint);
+    let lessor_collateral_associated_token_account = derive_associated_token_account(&scenario.lessor.pubkey(), &scenario.collateral_mint);
     assert_eq!(
-        get_token_account_balance(&sc.svm, &lessor_collateral_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &lessor_collateral_associated_token_account).unwrap(),
         REQUIRED_COLLATERAL
     );
     assert_eq!(
-        get_token_account_balance(&sc.svm, &sc.lessor_leased_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &scenario.lessor_leased_associated_token_account).unwrap(),
         1_000_000_000 - LEASED_AMOUNT
     );
 
-    let (lease_pda, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    assert!(sc.svm.get_account(&lease_pda).is_none());
-    assert!(sc.svm.get_account(&leased_vault).is_none());
-    assert!(sc.svm.get_account(&collateral_vault).is_none());
+    let (lease_program_derived_address, leased_vault, collateral_vault) =
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    assert!(scenario.svm.get_account(&lease_program_derived_address).is_none());
+    assert!(scenario.svm.get_account(&leased_vault).is_none());
+    assert!(scenario.svm.get_account(&collateral_vault).is_none());
 }
 
 #[test]
 fn close_expired_cancels_listed_lease() {
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 9u64;
 
-    let create_ix = build_create_lease_ix(
-        &sc,
+    let create_instruction = build_create_lease_instruction(
+        &scenario,
         lease_id,
         LEASED_AMOUNT,
         REQUIRED_COLLATERAL,
         LEASE_FEE_PER_SECOND,
         DURATION_SECONDS,
-        MAINTENANCE_MARGIN_BPS,
-        LIQUIDATION_BOUNTY_BPS,
+        MAINTENANCE_MARGIN_BASIS_POINTS,
+        LIQUIDATION_BOUNTY_BASIS_POINTS,
         FEED_ID,
     );
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![create_ix],
-        &[&sc.lessor],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![create_instruction],
+        &[&scenario.lessor],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     // Lessor bails before anyone takes the lease — allowed immediately.
-    let close_ix = build_close_expired_ix(&sc, lease_id);
+    let close_instruction = build_close_expired_instruction(&scenario, lease_id);
     send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![close_ix],
-        &[&sc.lessor],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![close_instruction],
+        &[&scenario.lessor],
+        &scenario.lessor.pubkey(),
     )
     .unwrap();
 
     // Lessor recovered the full leased amount. No collateral was ever posted.
     assert_eq!(
-        get_token_account_balance(&sc.svm, &sc.lessor_leased_ata).unwrap(),
+        get_token_account_balance(&scenario.svm, &scenario.lessor_leased_associated_token_account).unwrap(),
         1_000_000_000
     );
-    let (lease_pda, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    assert!(sc.svm.get_account(&lease_pda).is_none());
-    assert!(sc.svm.get_account(&leased_vault).is_none());
-    assert!(sc.svm.get_account(&collateral_vault).is_none());
+    let (lease_program_derived_address, leased_vault, collateral_vault) =
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    assert!(scenario.svm.get_account(&lease_program_derived_address).is_none());
+    assert!(scenario.svm.get_account(&leased_vault).is_none());
+    assert!(scenario.svm.get_account(&collateral_vault).is_none());
 }
 
 #[test]
@@ -970,33 +970,33 @@ fn create_lease_rejects_same_mint_for_leased_and_collateral() {
     // same authority seed pattern) and make lease-fee-vs-collateral accounting
     // ambiguous. The program rejects this up-front with
     // `LeasedMintEqualsCollateralMint`.
-    let mut sc = full_setup();
+    let mut scenario = full_setup();
     let lease_id = 42u64;
 
     // Build a `create_lease` instruction where the collateral_mint field
-    // carries the same mint as leased_mint. We bypass `build_create_lease_ix`
+    // carries the same mint as leased_mint. We bypass `build_create_lease_instruction`
     // because that helper always wires the two mints from the scenario.
     let (lease, leased_vault, collateral_vault) =
-        lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
-    let ix = Instruction::new_with_bytes(
-        sc.program_id,
+        lease_program_derived_addresses(&scenario.program_id, &scenario.lessor.pubkey(), lease_id);
+    let instruction = Instruction::new_with_bytes(
+        scenario.program_id,
         &asset_leasing::instruction::CreateLease {
             lease_id,
             leased_amount: LEASED_AMOUNT,
             required_collateral_amount: REQUIRED_COLLATERAL,
             lease_fee_per_second: LEASE_FEE_PER_SECOND,
             duration_seconds: DURATION_SECONDS,
-            maintenance_margin_bps: MAINTENANCE_MARGIN_BPS,
-            liquidation_bounty_bps: LIQUIDATION_BOUNTY_BPS,
+            maintenance_margin_basis_points: MAINTENANCE_MARGIN_BASIS_POINTS,
+            liquidation_bounty_basis_points: LIQUIDATION_BOUNTY_BASIS_POINTS,
             feed_id: FEED_ID,
         }
         .data(),
         asset_leasing::accounts::CreateLease {
-            lessor: sc.lessor.pubkey(),
-            leased_mint: sc.leased_mint,
+            lessor: scenario.lessor.pubkey(),
+            leased_mint: scenario.leased_mint,
             // Same mint on both sides — should be rejected.
-            collateral_mint: sc.leased_mint,
-            lessor_leased_account: sc.lessor_leased_ata,
+            collateral_mint: scenario.leased_mint,
+            lessor_leased_account: scenario.lessor_leased_associated_token_account,
             lease,
             leased_vault,
             collateral_vault,
@@ -1007,10 +1007,10 @@ fn create_lease_rejects_same_mint_for_leased_and_collateral() {
     );
 
     let result = send_transaction_from_instructions(
-        &mut sc.svm,
-        vec![ix],
-        &[&sc.lessor],
-        &sc.lessor.pubkey(),
+        &mut scenario.svm,
+        vec![instruction],
+        &[&scenario.lessor],
+        &scenario.lessor.pubkey(),
     );
 
     let err = result.expect_err("create_lease must reject identical leased/collateral mints");

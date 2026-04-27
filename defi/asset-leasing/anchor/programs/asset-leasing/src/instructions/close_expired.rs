@@ -8,7 +8,7 @@ use crate::{
     constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
     errors::AssetLeasingError,
     instructions::{
-        pay_lease_fee::update_last_paid_ts,
+        pay_lease_fee::update_last_paid_timestamp,
         shared::{close_vault, transfer_tokens_from_vault},
     },
     state::{Lease, LeaseStatus},
@@ -18,7 +18,7 @@ use crate::{
 ///
 /// - The lease sat in `Listed` and the lessor wants to cancel it, recovering
 ///   the leased tokens they pre-funded. Allowed any time.
-/// - The lease was `Active` but the lessee ghosted past `end_ts`. The lessor
+/// - The lease was `Active` but the lessee ghosted past `end_timestamp`. The lessor
 ///   takes the collateral as compensation and closes the books.
 #[derive(Accounts)]
 pub struct CloseExpired<'info> {
@@ -93,7 +93,7 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
     // no start/end so the check is skipped.
     if status == LeaseStatus::Active {
         require!(
-            now >= context.accounts.lease.end_ts,
+            now >= context.accounts.lease.end_timestamp,
             AssetLeasingError::LeaseNotExpired
         );
     }
@@ -159,18 +159,18 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
     //
     // We are not forwarding any accrued lease fees to the lessor here — on default
     // the lessor takes the whole collateral vault as compensation — but we
-    // still bump \`last_paid_ts\` so the invariant
-    // \`last_paid_ts <= now.min(end_ts)\` stays intact. That matters for
+    // still bump \`last_paid_timestamp\` so the invariant
+    // \`last_paid_timestamp <= now.min(end_timestamp)\` stays intact. That matters for
     // any future version of the program that wants to split the collateral
     // differently (pro-rata lease fees, partial refund on default, haircut to the
     // lessee for unused time): such a version can read
-    // \`last_paid_ts\` and trust that everything up to \`now\` is already
+    // \`last_paid_timestamp\` and trust that everything up to \`now\` is already
     // settled, rather than having to reason about whether this branch ever
     // bumped the timestamp.
     //
     // No-op on the \`Listed\` branch because Lease fees never started accruing.
     if status == LeaseStatus::Active {
-        update_last_paid_ts(&mut context.accounts.lease, now);
+        update_last_paid_timestamp(&mut context.accounts.lease, now);
     }
     context.accounts.lease.collateral_amount = 0;
     context.accounts.lease.status = LeaseStatus::Closed;

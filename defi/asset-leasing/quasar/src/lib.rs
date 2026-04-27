@@ -12,7 +12,7 @@ use instructions::*;
 mod tests;
 
 // Same program id as the Anchor version so off-chain tooling that derives
-// PDAs or looks up the program on-chain works against both binaries
+// program-derived addresses or looks up the program on-chain works against both binaries
 // interchangeably.
 declare_id!("Lease11111111111111111111111111111111111111");
 
@@ -30,60 +30,60 @@ mod quasar_asset_leasing {
     /// lifecycle (create → take → pay/top-up → return/liquidate/close).
     #[instruction(discriminator = 0)]
     pub fn create_lease(
-        ctx: Ctx<CreateLease>,
+        context: Ctx<CreateLease>,
         lease_id: u64,
         leased_amount: u64,
         required_collateral_amount: u64,
         lease_fee_per_second: u64,
         duration_seconds: i64,
-        maintenance_margin_bps: u16,
-        liquidation_bounty_bps: u16,
+        maintenance_margin_basis_points: u16,
+        liquidation_bounty_basis_points: u16,
         feed_id: [u8; 32],
     ) -> Result<(), ProgramError> {
         instructions::handle_create_lease(
-            &mut ctx.accounts,
+            &mut context.accounts,
             lease_id,
             leased_amount,
             required_collateral_amount,
             lease_fee_per_second,
             duration_seconds,
-            maintenance_margin_bps,
-            liquidation_bounty_bps,
+            maintenance_margin_basis_points,
+            liquidation_bounty_basis_points,
             feed_id,
-            &ctx.bumps,
+            &context.bumps,
         )
     }
 
     #[instruction(discriminator = 1)]
-    pub fn take_lease(ctx: Ctx<TakeLease>) -> Result<(), ProgramError> {
-        instructions::handle_take_lease(&mut ctx.accounts)
+    pub fn take_lease(context: Ctx<TakeLease>) -> Result<(), ProgramError> {
+        instructions::handle_take_lease(&mut context.accounts)
     }
 
     #[instruction(discriminator = 2)]
-    pub fn pay_lease_fee(ctx: Ctx<PayLeaseFee>) -> Result<(), ProgramError> {
-        instructions::handle_pay_lease_fee(&mut ctx.accounts)
+    pub fn pay_lease_fee(context: Ctx<PayLeaseFee>) -> Result<(), ProgramError> {
+        instructions::handle_pay_lease_fee(&mut context.accounts)
     }
 
     #[instruction(discriminator = 3)]
     pub fn top_up_collateral(
-        ctx: Ctx<TopUpCollateral>,
+        context: Ctx<TopUpCollateral>,
         amount: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_top_up_collateral(&mut ctx.accounts, amount)
+        instructions::handle_top_up_collateral(&mut context.accounts, amount)
     }
 
     #[instruction(discriminator = 4)]
-    pub fn return_lease(ctx: Ctx<ReturnLease>) -> Result<(), ProgramError> {
-        instructions::handle_return_lease(&mut ctx.accounts)
+    pub fn return_lease(context: Ctx<ReturnLease>) -> Result<(), ProgramError> {
+        instructions::handle_return_lease(&mut context.accounts)
     }
 
     #[instruction(discriminator = 5)]
-    pub fn liquidate(ctx: Ctx<Liquidate>) -> Result<(), ProgramError> {
-        instructions::handle_liquidate(&mut ctx.accounts)
+    pub fn liquidate(context: Ctx<Liquidate>) -> Result<(), ProgramError> {
+        instructions::handle_liquidate(&mut context.accounts)
     }
 
     #[instruction(discriminator = 6)]
-    pub fn close_expired(ctx: Ctx<CloseExpired>) -> Result<(), ProgramError> {
-        instructions::handle_close_expired(&mut ctx.accounts)
+    pub fn close_expired(context: Ctx<CloseExpired>) -> Result<(), ProgramError> {
+        instructions::handle_close_expired(&mut context.accounts)
     }
 }

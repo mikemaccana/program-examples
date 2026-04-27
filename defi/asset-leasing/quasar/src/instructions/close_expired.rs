@@ -2,7 +2,7 @@ use {
     crate::{
         constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
         errors::AssetLeasingError,
-        instructions::pay_lease_fee::update_last_paid_ts,
+        instructions::pay_lease_fee::update_last_paid_timestamp,
         state::{Lease, LeaseStatus},
     },
     quasar_lang::prelude::*,
@@ -13,7 +13,7 @@ use {
 ///
 /// - The lease sat in `Listed` and the lessor wants to cancel it,
 ///   recovering the leased tokens they pre-funded. Allowed any time.
-/// - The lease was `Active` but the lessee ghosted past `end_ts`. The
+/// - The lease was `Active` but the lessee ghosted past `end_timestamp`. The
 ///   lessor takes the collateral as compensation and closes the books.
 #[derive(Accounts)]
 pub struct CloseExpired<'info> {
@@ -71,8 +71,8 @@ pub fn handle_close_expired(accounts: &mut CloseExpired) -> Result<(), ProgramEr
     // Active leases can only be closed after they expire. Listed leases
     // have no start/end so the check is skipped.
     if status == LeaseStatus::Active {
-        let end_ts = accounts.lease.end_ts.get();
-        if now < end_ts {
+        let end_timestamp = accounts.lease.end_timestamp.get();
+        if now < end_timestamp {
             return Err(AssetLeasingError::LeaseNotExpired.into());
         }
     }
@@ -144,10 +144,10 @@ pub fn handle_close_expired(accounts: &mut CloseExpired) -> Result<(), ProgramEr
     // lessor takes the whole collateral vault as compensation here, but
     // any future version of the program that wants to split the
     // collateral differently (pro-rata lease fees, partial refund on default)
-    // can read `last_paid_ts` and trust that everything up to
+    // can read `last_paid_timestamp` and trust that everything up to
     // `now` is already settled.
     if status == LeaseStatus::Active {
-        update_last_paid_ts(accounts.lease, now);
+        update_last_paid_timestamp(accounts.lease, now);
     }
     accounts.lease.collateral_amount = 0u64.into();
     accounts.lease.status = LeaseStatus::Closed as u8;

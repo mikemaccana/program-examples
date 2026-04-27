@@ -16,7 +16,7 @@ pub struct TopUpCollateral<'info> {
     #[account(mut)]
     pub lessee: &'info Signer,
 
-    /// PDA seed only — not read directly.
+    /// program-derived address seed only — not read directly.
     pub lessor: &'info UncheckedAccount,
 
     #[account(

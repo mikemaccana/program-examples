@@ -60,19 +60,19 @@ pub struct Lease {
     pub lease_fee_per_second: u64,
     pub duration_seconds: i64,
     /// `0` while `Listed`; `unix_timestamp` of `take_lease` while `Active`.
-    pub start_ts: i64,
-    /// `0` while `Listed`; `start_ts + duration_seconds` once `Active`.
-    pub end_ts: i64,
-    /// Lease fee accrues from here to `min(now, end_ts)`.
-    pub last_paid_ts: i64,
+    pub start_timestamp: i64,
+    /// `0` while `Listed`; `start_timestamp + duration_seconds` once `Active`.
+    pub end_timestamp: i64,
+    /// Lease fee accrues from here to `min(now, end_timestamp)`.
+    pub last_paid_timestamp: i64,
 
     /// Collateral-over-debt ratio in basis points.
-    /// `12_000` bps = 120%. Capped at `MAX_MAINTENANCE_MARGIN_BPS`.
-    pub maintenance_margin_bps: u16,
+    /// `12_000` basis points = 120%. Capped at `MAX_MAINTENANCE_MARGIN_BASIS_POINTS`.
+    pub maintenance_margin_basis_points: u16,
     /// Keeper's cut of the post-lease-fee collateral on liquidation, in basis
-    /// points. Capped at `MAX_LIQUIDATION_BOUNTY_BPS` to stop a malicious
+    /// points. Capped at `MAX_LIQUIDATION_BOUNTY_BASIS_POINTS` to stop a malicious
     /// lessor from draining the recovery pool via the bounty.
-    pub liquidation_bounty_bps: u16,
+    pub liquidation_bounty_basis_points: u16,
 
     /// Pyth feed id this lease is pinned to at creation. Enforced on every
     /// `liquidate` so a keeper cannot swap in an unrelated feed to force an
