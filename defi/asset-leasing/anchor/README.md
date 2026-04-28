@@ -17,23 +17,23 @@ anyway (think exchange-traded funds, pension funds, or any passive
 allocator), and short sellers and arbitrageurs get the tokens they
 need to sell short. The program is written in
 [Anchor](https://solana.com/docs/terminology); a parallel
-[Quasar port](#6-quasar-port) implements the same onchain behaviour.
+[Quasar port](#quasar-port) implements the same onchain behaviour.
 
 ---
 
 ## Table of contents
 
-1. [What does this program do?](#1-what-does-this-program-do)
-2. [Accounts and program-derived addresses](#2-accounts-and-program-derived-addresses)
-3. [Lifecycle](#3-lifecycle)
-4. [Safety and edge cases](#4-safety-and-edge-cases)
-5. [Running the tests](#5-running-the-tests)
-6. [Quasar port](#6-quasar-port)
-7. [Extending the program](#7-extending-the-program)
+1. [What does this program do?](#what-does-this-program-do)
+2. [Accounts and program-derived addresses](#accounts-and-program-derived-addresses)
+3. [Lifecycle](#lifecycle)
+4. [Safety and edge cases](#safety-and-edge-cases)
+5. [Running the tests](#running-the-tests)
+6. [Quasar port](#quasar-port)
+7. [Extending the program](#extending-the-program)
 
 ---
 
-## 1. What does this program do?
+## What does this program do?
 
 A **holder** offers some quantity of **token A** - the leased token -
 for a fixed term. A **short seller** posts collateral in a different
@@ -165,7 +165,7 @@ rallies against the collateral. A drop in the borrowed asset price is
 purely beneficial to the short seller. The streaming lending fee is
 the position's only ongoing cost in either direction.
 
-[Section 3 (Lifecycle)](#3-lifecycle) walks each instruction handler
+The [lifecycle](#lifecycle) section walks each instruction handler
 with concrete numbers that match the LiteSVM tests; the xNVDA example
 above is the same machinery applied to a real asset pair.
 
@@ -176,11 +176,11 @@ above is the same machinery applied to a real asset pair.
   inline in `liquidate.rs`. Production code would depend on the
   `pyth-solana-receiver-sdk` crate so layout changes are caught at
   compile time.
-- See [Section 4 (Safety and edge cases)](#4-safety-and-edge-cases) for the rest of the deliberate simplifications.
+- See [safety and edge cases](#safety-and-edge-cases) for the rest of the deliberate simplifications.
 
 ---
 
-## 2. Accounts and program-derived addresses
+## Accounts and program-derived addresses
 
 Every call to the program touches some subset of these accounts. The
 three [program-derived addresses](https://solana.com/docs/terminology)
@@ -254,7 +254,7 @@ record the terminal state, but the account disappears at the end.
 
 ---
 
-## 3. Lifecycle
+## Lifecycle
 
 ### What the short seller really gets
 
@@ -275,9 +275,9 @@ the cost of fulfilling the obligation later is fixed in tokens whose
 price is unknown. Bet correctly on the direction and that asymmetry
 prints money. Bet wrong and the cost of buying the tokens back can
 exceed the cash plus the collateral, at which point the keepers
-arrive (see [§3.6](#36-branch-position-underwater---liquidate)).
+arrive (see [branch: position underwater - `liquidate`](#branch-position-underwater---liquidate)).
 
-### 3.1 The holder lists the tokens - `create_lease`
+### The holder lists the tokens - `create_lease`
 
 The holder calls `create_lease`, naming the leased mint, the
 collateral mint, the amount of leased tokens to offer, the
@@ -318,7 +318,7 @@ transfers to the program the moment the lease is listed.
   - `InvalidMaintenanceMargin` if `maintenance_margin_basis_points` is `0` or `> 50_000`
   - `InvalidLiquidationBounty` if `liquidation_bounty_basis_points > 2_000`
 
-### 3.2 The short seller takes the offer - `take_lease`
+### The short seller takes the offer - `take_lease`
 
 A short seller who has spotted the `Lease` account onchain (via an
 indexer or a direct lookup) calls `take_lease` to take delivery. The
@@ -357,7 +357,7 @@ moves from `Listed` to `Active`.
     `collateral_mint` do not match the values stored on the lease
   - `MathOverflow` if `now + duration_seconds` overflows `i64`
 
-### 3.3 The lease fee streams - `pay_lease_fee`
+### The lease fee streams - `pay_lease_fee`
 
 The lease fee accrues second by second out of the collateral vault.
 Anyone can call `pay_lease_fee` to settle whatever has accrued since
@@ -388,13 +388,13 @@ being liquidated, or defaulting; no further lease fees are owed.
   - If the vault did not have enough collateral to cover the full
     `lease_fee_due`, the residual is silently left as a debt the next
     `liquidate` or `close_expired` call cleans up. (See
-    [Section 4 (Safety and edge cases)](#4-safety-and-edge-cases) for
+    [safety and edge cases](#safety-and-edge-cases) for
     the rationale on this trade-off.)
 - **Errors:**
   - `InvalidLeaseStatus` if the lease is not `Active`
   - `MathOverflow` if `elapsed * lease_fee_per_second` overflows `u64`
 
-### 3.4 The short seller defends the position - `top_up_collateral`
+### The short seller defends the position - `top_up_collateral`
 
 If the price moves against the short seller and the position drifts
 toward the maintenance-margin floor, the short seller can add more
@@ -423,7 +423,7 @@ is `Active`.
   - `InvalidLeaseStatus` if the lease is not `Active`
   - `MathOverflow` if the addition overflows `u64`
 
-### 3.5 The short seller closes - `return_lease`
+### The short seller closes - `return_lease`
 
 To close the position, the short seller buys back the leased tokens
 on the open market and calls `return_lease`. The program runs the
@@ -476,7 +476,7 @@ time at `end_timestamp`.
   - `Unauthorised` if `lease.short_seller != short_seller.key()`
   - `MathOverflow` if the lease-fee or collateral subtraction overflows
 
-### 3.6 Branch: position underwater - `liquidate`
+### Branch: position underwater - `liquidate`
 
 If the leased asset rallies far enough that the locked collateral is
 no longer worth more than the debt times the maintenance margin,
@@ -545,7 +545,7 @@ math non-negative (see [`is_underwater`](programs/asset-leasing/src/instructions
   - `InvalidLeaseStatus` if the lease is not `Active`
   - `MathOverflow` on any of the integer-multiplication steps
 
-### 3.7 Branch: cancel or default - `close_expired`
+### Branch: cancel or default - `close_expired`
 
 The holder has a single recovery handler that covers two unrelated
 situations:
@@ -591,7 +591,7 @@ rent-exempt-lamport refunds going to the holder.
   - `InvalidLeaseStatus` if `status` is not `Listed` or `Active`
   - `LeaseNotExpired` if `status == Active` and `now < end_timestamp`
 
-### 3.8 Branch scenarios
+### Branch scenarios
 
 The handlers above cover the happy path. The branch scenarios below
 walk the same machinery through liquidation, a falling-price profit,
@@ -615,9 +615,9 @@ Shared starting parameters:
 The holder starts with 1 000 000 000 leased units; the short seller
 starts with 1 000 000 000 collateral units. Each scenario opens with
 `create_lease` and (where relevant) `take_lease` running as described
-in [§3.1](#31-the-holder-lists-the-tokens---create_lease) and [§3.2](#32-the-short-seller-takes-the-offer---take_lease). Lease fees use the formula in [§3.3](#33-the-lease-fee-streams---pay_lease_fee).
+in [the holder lists the tokens - `create_lease`](#the-holder-lists-the-tokens---create_lease) and [the short seller takes the offer - `take_lease`](#the-short-seller-takes-the-offer---take_lease). Lease fees use the formula in [the lease fee streams - `pay_lease_fee`](#the-lease-fee-streams---pay_lease_fee).
 
-#### 3.8.1 Liquidation - leased asset rallies
+#### Liquidation - leased asset rallies
 
 `create_lease` and `take_lease` run as standard, leaving
 `collateral_vault = 200_000_000`, `leased_vault = 0`, and the short
@@ -630,7 +630,7 @@ pot of ~200 000 000 - maintenance ratio is `200/400 = 50%`, far below
 the required 120%. The keeper does not need to call `pay_lease_fee`
 first; `liquidate` settles accrued fees itself.
 
-The keeper calls `liquidate` (mechanics in [§3.6](#36-branch-position-underwater---liquidate)). At `T + 300`:
+The keeper calls `liquidate` (mechanics in [branch: position underwater - `liquidate`](#branch-position-underwater---liquidate)). At `T + 300`:
 
 - Accrued lease fee: `300 × 10 = 3_000` collateral units. The vault
   has 200 000 000, so `lease_fee_payable = 3_000` flows to the holder.
@@ -655,7 +655,7 @@ The asymmetry to remember: liquidation does *not* reclaim the leased
 tokens. The collateral pays the holder for the lost asset; the short
 seller has effectively bought the leased tokens at the forfeit price.
 
-#### 3.8.2 Falling price - short seller profits
+#### Falling price - short seller profits
 
 `create_lease` and `take_lease` run as standard. Time jumps to
 `T + 300`. The leased-in-collateral price has fallen sharply: take
@@ -669,7 +669,7 @@ a healthy position.
 At `T + 600` (10 minutes in) the short seller buys 100 leased tokens
 on the open market at the new price (about 50 collateral tokens
 total - far less than the 200 they posted) and calls `return_lease`
-(mechanics in [§3.5](#35-the-short-seller-closes---return_lease)). Accrued lease fees are `600 × 10 = 6_000`
+(mechanics in [the short seller closes - `return_lease`](#the-short-seller-closes---return_lease)). Accrued lease fees are `600 × 10 = 6_000`
 collateral units. The settlement:
 
 - 100 000 000 leased units flow short seller → leased vault → holder.
@@ -690,10 +690,10 @@ Final balances:
   payoff.
 
 The short seller can defend a borderline position with
-`top_up_collateral` ([§3.4](#34-the-short-seller-defends-the-position---top_up_collateral)) or close it early via `return_lease`
-([§3.5](#35-the-short-seller-closes---return_lease)). Only adverse price moves trigger liquidation.
+`top_up_collateral` ([the short seller defends the position - `top_up_collateral`](#the-short-seller-defends-the-position---top_up_collateral)) or close it early via `return_lease`
+([the short seller closes - `return_lease`](#the-short-seller-closes---return_lease)). Only adverse price moves trigger liquidation.
 
-#### 3.8.3 Default - `close_expired` on an `Active` lease
+#### Default - `close_expired` on an `Active` lease
 
 `create_lease` and `take_lease` run as standard. The short seller
 takes the tokens, posts collateral, then disappears. `pay_lease_fee`
@@ -701,7 +701,7 @@ is never called. The clock advances past
 `end_timestamp = T + 86_400`.
 
 At `T + 100_000` the holder calls `close_expired` (mechanics in
-[§3.7](#37-branch-cancel-or-default---close_expired)). Because `status == Active` and `now >= end_timestamp`, the
+[branch: cancel or default - `close_expired`](#branch-cancel-or-default---close_expired)). Because `status == Active` and `now >= end_timestamp`, the
 default branch runs:
 
 - `leased_vault` is empty (the short seller kept the tokens) - no
@@ -719,11 +719,11 @@ Final balances:
 - **Short seller:** 100 000 000 leased units, paid the full
   collateral and kept the leased tokens.
 
-#### 3.8.4 Cancel - `close_expired` on a `Listed` lease
+#### Cancel - `close_expired` on a `Listed` lease
 
 The cheap cancel path. `create_lease` runs; no short seller ever
 calls `take_lease`. The holder calls `close_expired` immediately
-(mechanics in [§3.7](#37-branch-cancel-or-default---close_expired)). Because `status == Listed`, no expiry check
+(mechanics in [branch: cancel or default - `close_expired`](#branch-cancel-or-default---close_expired)). Because `status == Listed`, no expiry check
 applies:
 
 - `leased_vault` holds 100 000 000 leased units; all of it drains
@@ -736,9 +736,9 @@ nothing else moved.
 
 ---
 
-## 4. Safety and edge cases
+## Safety and edge cases
 
-### 4.1 What the program refuses to do
+### What the program refuses to do
 
 All of the following come from [`errors.rs`](programs/asset-leasing/src/errors.rs)
 and are enforced by either an Anchor constraint or a `require!` in the
@@ -761,7 +761,7 @@ handler:
 - **`LeasedMintEqualsCollateralMint`** - `create_lease` called with the same mint for both sides.
 - **`PriceFeedMismatch`** - `liquidate` called with a Pyth update whose `feed_id` does not match `lease.feed_id`.
 
-### 4.2 Guarded design choices worth knowing
+### Guarded design choices worth knowing
 
 - **Leased tokens are locked up-front.** `create_lease` moves the tokens
   into the `leased_vault` immediately, so a short seller calling
@@ -805,7 +805,7 @@ handler:
   cut would dwarf the holder's recovery on default. The cap keeps
   liquidation economics roughly in line with holder-first semantics.
 
-### 4.3 Things the program does *not* guard against
+### Things the program does *not* guard against
 
 A production version of the program would want more:
 
@@ -847,7 +847,7 @@ A production version of the program would want more:
 
 ---
 
-## 5. Running the tests
+## Running the tests
 
 All the tests are LiteSVM-based Rust integration tests under
 [`programs/asset-leasing/tests/`](programs/asset-leasing/tests/). They
@@ -918,7 +918,7 @@ CI is already covered.
 
 ---
 
-## 6. Quasar port
+## Quasar port
 
 A parallel implementation of the same program using
 [Quasar](https://github.com/blueshift-gg/quasar) lives in
@@ -1019,7 +1019,7 @@ handler. Tests are in `src/tests.rs`.
 
 ---
 
-## 7. Extending the program
+## Extending the program
 
 Directions a real-world version of the program would consider,
 grouped by effort:
