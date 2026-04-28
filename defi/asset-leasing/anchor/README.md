@@ -19,12 +19,6 @@ need to sell short. The program is written in
 [Anchor](https://solana.com/docs/terminology); a parallel
 [Quasar port](#7-quasar-port) implements the same onchain behaviour.
 
-Every [instruction handler](https://solana.com/docs/terminology) is
-walked through with the exact token movements it causes. The
-background sections below define the financial concepts (collateral,
-maintenance margin, oracles) and the onchain wiring before any code
-walks happen.
-
 ---
 
 ## Table of contents
@@ -293,9 +287,10 @@ record the terminal state, but the account disappears at the end.
 
 An instruction on Solana is the input sent in a transaction — a
 program id, a list of accounts, and a byte payload. The Rust function
-that runs when an instruction arrives is the *instruction handler*.
-This program has seven instruction handlers. The natural order a
-user encounters them — the order below — is:
+that runs when an instruction arrives is the
+[instruction handler](https://solana.com/docs/terminology). This
+program has seven instruction handlers. The natural order a user
+encounters them — the order below — is:
 
 1. `create_lease` (holder)
 2. `take_lease` (short seller)
