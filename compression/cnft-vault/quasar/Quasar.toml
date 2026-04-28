@@ -5,4 +5,18 @@ name = "quasar_cnft_vault"
 type = "solana"
 
 [testing]
-framework = "quasarsvm-rust"
+language = "rust"
+
+[testing.rust]
+framework = "quasar-svm"
+
+[testing.rust.test]
+program = "cargo"
+args = [
+    "test",
+    "tests::",
+]
+
+[clients]
+path = "target/client"
+languages = ["rust"]
