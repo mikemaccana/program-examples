@@ -114,15 +114,13 @@ Bob wants short exposure to NVIDIA without using a perpetual future.
 Alice lists the lease (assume USDC is 6-decimal, xNVDA is also
 6-decimal for round numbers):
 
-| Parameter | Value | Notes |
-|---|---|---|
-| `leased_amount` | `100_000_000` (100 xNVDA) | |
-| `required_collateral_amount` | `22_000_000_000` (22 000 USDC) | ~122% LTV at the spot price |
-| `lease_fee_per_second` | `456` (USDC base units / s) | ≈ 8% APR on 18 000 USDC notional |
-| `duration_seconds` | `2_592_000` | 30 days |
-| `maintenance_margin_basis_points` | `11_000` | 110% |
-| `liquidation_bounty_basis_points` | `100` | 1% of post-fee collateral |
-| `feed_id` | Pyth xNVDA/USD feed id | ([Pyth feed registry](https://www.pyth.network/price-feeds)) |
+- **`leased_amount`**: `100_000_000` (100 xNVDA)
+- **`required_collateral_amount`**: `22_000_000_000` (22 000 USDC) - ~122% LTV at the spot price
+- **`lease_fee_per_second`**: `456` (USDC base units / s) - ≈ 8% APR on 18 000 USDC notional
+- **`duration_seconds`**: `2_592_000` - 30 days
+- **`maintenance_margin_basis_points`**: `11_000` - 110%
+- **`liquidation_bounty_basis_points`**: `100` - 1% of post-fee collateral
+- **`feed_id`**: Pyth xNVDA/USD feed id ([Pyth feed registry](https://www.pyth.network/price-feeds))
 
 Bob calls `take_lease`, posts 22 000 USDC, receives 100 xNVDA, and
 sells the 100 xNVDA on Jupiter for ~18 000 USDC at the spot price.
@@ -183,31 +181,25 @@ are created on `create_lease` and destroyed on `return_lease` /
 
 ### State / data accounts
 
-| Account | program-derived address? | Seeds | Kind | Authority | Holds |
-|---|---|---|---|---|---|
-| `Lease` | yes | `["lease", holder, lease_id]` | data | program | all the lease parameters and current lifecycle state (see below) |
+- **`Lease`** - program-derived address with seeds `["lease", holder, lease_id]`. Data account owned by the program, holding all the lease parameters and current lifecycle state (see below).
 
 ### Token vaults
 
-| Account | program-derived address? | Seeds | Kind | Authority | Holds |
-|---|---|---|---|---|---|
-| `leased_vault` | yes | `["leased_vault", lease]` | token account | itself (program-derived address-signed) | `leased_amount` while `Listed`; 0 while `Active` (short seller has the tokens); full amount again briefly inside `return_lease` |
-| `collateral_vault` | yes | `["collateral_vault", lease]` | token account | itself (program-derived address-signed) | 0 while `Listed`; `collateral_amount` while `Active`, decreasing as lease fee streams out and increasing on `top_up_collateral` |
+- **`leased_vault`** - program-derived address with seeds `["leased_vault", lease]`. Token account whose authority is itself (program-derived-address-signed). Holds `leased_amount` while `Listed`; `0` while `Active` (the short seller has the tokens); full amount again briefly inside `return_lease`.
+- **`collateral_vault`** - program-derived address with seeds `["collateral_vault", lease]`. Token account whose authority is itself (program-derived-address-signed). Holds `0` while `Listed`; `collateral_amount` while `Active`, decreasing as lease fee streams out and increasing on `top_up_collateral`.
 
 ### User accounts passed in
 
-| Account | Owner | Purpose |
-|---|---|---|
-| `holder` wallet | user | `create_lease` signer, receives the lease fee and final recovery |
-| `short_seller` wallet | user | `take_lease` / `top_up_collateral` / `return_lease` signer |
-| `keeper` wallet | user | `liquidate` signer, receives the bounty |
-| `payer` wallet | user | `pay_lease_fee` signer (can be anyone, not just the short seller) |
-| `holder_leased_account` | token account | holder's [associated token account](https://solana.com/docs/terminology) for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired` |
-| `holder_collateral_account` | token account | holder's associated token account for the collateral mint; destination for the lease fee and liquidation proceeds |
-| `short_seller_leased_account` | token account | short seller's associated token account for the leased mint; destination on `take_lease`, source on `return_lease` |
-| `short_seller_collateral_account` | token account | short seller's associated token account for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease` |
-| `keeper_collateral_account` | token account | keeper's associated token account for the collateral mint; receives the liquidation bounty |
-| `price_update` | Pyth Receiver program | `PriceUpdateV2` account for the feed the lease is pinned to |
+- **`holder` wallet** (user-owned) - `create_lease` signer, receives the lease fee and final recovery.
+- **`short_seller` wallet** (user-owned) - `take_lease` / `top_up_collateral` / `return_lease` signer.
+- **`keeper` wallet** (user-owned) - `liquidate` signer, receives the bounty.
+- **`payer` wallet** (user-owned) - `pay_lease_fee` signer (can be anyone, not just the short seller).
+- **`holder_leased_account`** - holder's [associated token account](https://solana.com/docs/terminology) for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired`.
+- **`holder_collateral_account`** - holder's associated token account for the collateral mint; destination for the lease fee and liquidation proceeds.
+- **`short_seller_leased_account`** - short seller's associated token account for the leased mint; destination on `take_lease`, source on `return_lease`.
+- **`short_seller_collateral_account`** - short seller's associated token account for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease`.
+- **`keeper_collateral_account`** - keeper's associated token account for the collateral mint; receives the liquidation bounty.
+- **`price_update`** - `PriceUpdateV2` account owned by the Pyth Receiver program, for the feed the lease is pinned to.
 
 ### Fields on `Lease`
 
@@ -743,24 +735,22 @@ All of the following come from [`errors.rs`](programs/asset-leasing/src/errors.r
 and are enforced by either an Anchor constraint or a `require!` in the
 handler:
 
-| Error | When |
-|---|---|
-| `InvalidLeaseStatus` | Action tried against a lease in the wrong state (e.g. `take_lease` on a lease that is already `Active`) |
-| `InvalidDuration` | `duration_seconds <= 0` on `create_lease` |
-| `InvalidLeasedAmount` | `leased_amount == 0` on `create_lease` |
-| `InvalidCollateralAmount` | `required_collateral_amount == 0` on `create_lease`; `amount == 0` on `top_up_collateral` |
-| `InvalidLeaseFeePerSecond` | `lease_fee_per_second == 0` on `create_lease` |
-| `InvalidMaintenanceMargin` | `maintenance_margin_basis_points == 0` or `> 50_000` on `create_lease` |
-| `InvalidLiquidationBounty` | `liquidation_bounty_basis_points > 2_000` on `create_lease` |
-| `LeaseExpired` | Reserved; not currently used (lease fee accrual naturally caps at `end_timestamp`) |
-| `LeaseNotExpired` | `close_expired` called on an `Active` lease before `end_timestamp` |
-| `PositionHealthy` | `liquidate` called on a lease that passes the maintenance-margin check |
-| `StalePrice` | Pyth price update older than 60 s, or has a future `publish_time`, or fails discriminator / length check |
-| `NonPositivePrice` | Pyth price is `<= 0` |
-| `MathOverflow` | Any of the `checked_*` arithmetic returned `None` |
-| `Unauthorised` | Lease-modifying handler called by someone who is not the registered short seller (`top_up_collateral`, `return_lease`) |
-| `LeasedMintEqualsCollateralMint` | `create_lease` called with the same mint for both sides |
-| `PriceFeedMismatch` | `liquidate` called with a Pyth update whose `feed_id` does not match `lease.feed_id` |
+- **`InvalidLeaseStatus`** - action tried against a lease in the wrong state (e.g. `take_lease` on a lease that is already `Active`).
+- **`InvalidDuration`** - `duration_seconds <= 0` on `create_lease`.
+- **`InvalidLeasedAmount`** - `leased_amount == 0` on `create_lease`.
+- **`InvalidCollateralAmount`** - `required_collateral_amount == 0` on `create_lease`; `amount == 0` on `top_up_collateral`.
+- **`InvalidLeaseFeePerSecond`** - `lease_fee_per_second == 0` on `create_lease`.
+- **`InvalidMaintenanceMargin`** - `maintenance_margin_basis_points == 0` or `> 50_000` on `create_lease`.
+- **`InvalidLiquidationBounty`** - `liquidation_bounty_basis_points > 2_000` on `create_lease`.
+- **`LeaseExpired`** - reserved; not currently used (lease fee accrual naturally caps at `end_timestamp`).
+- **`LeaseNotExpired`** - `close_expired` called on an `Active` lease before `end_timestamp`.
+- **`PositionHealthy`** - `liquidate` called on a lease that passes the maintenance-margin check.
+- **`StalePrice`** - Pyth price update older than 60 s, or has a future `publish_time`, or fails discriminator / length check.
+- **`NonPositivePrice`** - Pyth price is `<= 0`.
+- **`MathOverflow`** - any of the `checked_*` arithmetic returned `None`.
+- **`Unauthorised`** - lease-modifying handler called by someone who is not the registered short seller (`top_up_collateral`, `return_lease`).
+- **`LeasedMintEqualsCollateralMint`** - `create_lease` called with the same mint for both sides.
+- **`PriceFeedMismatch`** - `liquidate` called with a Pyth update whose `feed_id` does not match `lease.feed_id`.
 
 ### 4.2 Guarded design choices worth knowing
 
@@ -897,19 +887,17 @@ test top_up_collateral_increases_vault_balance ... ok
 
 ### What each test exercises
 
-| Test | Exercises |
-|---|---|
-| `create_lease_locks_tokens_and_lists` | Holder funds vault, `Lease` created, collateral vault empty |
-| `create_lease_rejects_same_mint_for_leased_and_collateral` | Guard against `leased_mint == collateral_mint` |
-| `take_lease_posts_collateral_and_delivers_tokens` | Collateral deposit + leased-token payout in one instruction |
-| `pay_lease_fee_streams_collateral_by_elapsed_time` | Lease fee math: `elapsed * lease_fee_per_second`, lease fee transferred to holder |
-| `top_up_collateral_increases_vault_balance` | Collateral balance after `top_up` equals deposit + top-up |
-| `return_lease_refunds_unused_collateral` | Happy path round-trip - leased tokens returned, residual collateral refunded, accounts closed |
-| `liquidate_seizes_collateral_on_price_drop` | Price-induced underwater position → lease fee + bounty + holder share paid, accounts closed |
-| `liquidate_rejects_healthy_position` | Program refuses to liquidate a position that passes the margin check |
-| `liquidate_rejects_mismatched_price_feed` | Program refuses a `PriceUpdateV2` whose `feed_id` ≠ `lease.feed_id` |
-| `close_expired_reclaims_collateral_after_end_timestamp` | Default path - holder seizes the collateral |
-| `close_expired_cancels_listed_lease` | Holder-initiated cancel of an unrented lease |
+- **`create_lease_locks_tokens_and_lists`** - holder funds vault, `Lease` created, collateral vault empty.
+- **`create_lease_rejects_same_mint_for_leased_and_collateral`** - guard against `leased_mint == collateral_mint`.
+- **`take_lease_posts_collateral_and_delivers_tokens`** - collateral deposit + leased-token payout in one instruction.
+- **`pay_lease_fee_streams_collateral_by_elapsed_time`** - lease fee math: `elapsed * lease_fee_per_second`, lease fee transferred to holder.
+- **`top_up_collateral_increases_vault_balance`** - collateral balance after `top_up` equals deposit + top-up.
+- **`return_lease_refunds_unused_collateral`** - happy path round-trip; leased tokens returned, residual collateral refunded, accounts closed.
+- **`liquidate_seizes_collateral_on_price_drop`** - price-induced underwater position; lease fee + bounty + holder share paid, accounts closed.
+- **`liquidate_rejects_healthy_position`** - program refuses to liquidate a position that passes the margin check.
+- **`liquidate_rejects_mismatched_price_feed`** - program refuses a `PriceUpdateV2` whose `feed_id` does not match `lease.feed_id`.
+- **`close_expired_reclaims_collateral_after_end_timestamp`** - default path; holder seizes the collateral.
+- **`close_expired_cancels_listed_lease`** - holder-initiated cancel of an unrented lease.
 
 ### Note on CI
 
