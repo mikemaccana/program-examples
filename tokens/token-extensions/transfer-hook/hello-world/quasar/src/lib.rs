@@ -180,18 +180,19 @@ fn handle_initialize_extra_account_meta_list(
             .system_program
             .create_account(
                 &accounts.payer,
-                &*accounts.extra_account_meta_list,
+                &accounts.extra_account_meta_list,
                 lamports,
                 meta_list_size,
                 &crate::ID,
             )
             .invoke_signed(&seeds)?;
 
-        // Write TLV data into the account.
-        // SAFETY: Account was just created (16 bytes) and is owned by this program.
-        // UncheckedAccount is #[repr(transparent)] over AccountView, so the cast is safe.
-        let view = unsafe {
-            &mut *(accounts.extra_account_meta_list as *const UncheckedAccount as *mut UncheckedAccount
+        // Write TLV data into the account. The account was just created
+        // (16 bytes) and is owned by this program, so the borrow is safe.
+        // SAFETY: `UncheckedAccount` is `#[repr(transparent)]` over
+        // `AccountView`, so the reference cast is sound.
+        let view: &mut AccountView = unsafe {
+            &mut *(&mut accounts.extra_account_meta_list as *mut UncheckedAccount
                 as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;

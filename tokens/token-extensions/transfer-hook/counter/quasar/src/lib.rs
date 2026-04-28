@@ -95,7 +95,7 @@ fn handle_initialize_extra_account_meta_list(
             .system_program
             .create_account(
                 &accounts.payer,
-                &*accounts.extra_account_meta_list,
+                &accounts.extra_account_meta_list,
                 lamports,
                 meta_list_size,
                 &crate::ID,
@@ -104,7 +104,7 @@ fn handle_initialize_extra_account_meta_list(
 
         // Write TLV data with the counter PDA as an extra account
         let view = unsafe {
-            &mut *(accounts.extra_account_meta_list as *const UncheckedAccount as *mut UncheckedAccount
+            &mut *(&mut accounts.extra_account_meta_list as *mut UncheckedAccount
                 as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;
@@ -148,7 +148,7 @@ fn handle_initialize_extra_account_meta_list(
             .system_program
             .create_account(
                 &accounts.payer,
-                &*accounts.counter_account,
+                &accounts.counter_account,
                 counter_lamports,
                 counter_size,
                 &crate::ID,
@@ -184,7 +184,7 @@ pub struct TransferHook {
 fn handle_transfer_hook(accounts: &mut TransferHook) -> Result<(), ProgramError> {
         // Read the current counter from the account data
         let view = unsafe {
-            &mut *(accounts.counter_account as *const UncheckedAccount as *mut UncheckedAccount
+            &mut *(&mut accounts.counter_account as *mut UncheckedAccount
                 as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;

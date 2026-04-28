@@ -86,13 +86,12 @@ fn handle_initialize_extra_account_meta_list(
         ];
         accounts
             .system_program
-            .create_account(&accounts.payer, &*accounts.extra_account_meta_list, lamports, meta_list_size, &crate::ID)
+            .create_account(&accounts.payer, &accounts.extra_account_meta_list, lamports, meta_list_size, &crate::ID)
             .invoke_signed(&seeds)?;
 
         // Write TLV data
         let view = unsafe {
-            &mut *(accounts.extra_account_meta_list as *const UncheckedAccount
-                as *mut UncheckedAccount as *mut AccountView)
+            &mut *(&mut accounts.extra_account_meta_list as *mut UncheckedAccount as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;
         data[0..8].copy_from_slice(&EXECUTE_DISCRIMINATOR);
@@ -127,7 +126,7 @@ fn handle_initialize_extra_account_meta_list(
         ];
         accounts
             .system_program
-            .create_account(&accounts.payer, &*accounts.counter_account, counter_lamports, counter_size, &crate::ID)
+            .create_account(&accounts.payer, &accounts.counter_account, counter_lamports, counter_size, &crate::ID)
             .invoke_signed(&counter_seeds)?;
 
         log("Transfer cost hook initialized");
@@ -158,7 +157,7 @@ fn handle_transfer_hook(accounts: &mut TransferHook, amount: u64) -> Result<(), 
 
         // Increment transfer counter
         let view = unsafe {
-            &mut *(accounts.counter_account as *const UncheckedAccount as *mut UncheckedAccount
+            &mut *(&mut accounts.counter_account as *mut UncheckedAccount
                 as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;

@@ -102,13 +102,13 @@ fn handle_configure_admin(accounts: &mut ConfigureAdmin) -> Result<(), ProgramEr
         ];
         accounts
             .system_program
-            .create_account(&accounts.admin, &*accounts.admin_config, lamports, size, &crate::ID)
+            .create_account(&accounts.admin, &accounts.admin_config, lamports, size, &crate::ID)
             .invoke_signed(&seeds)?;
     }
 
     // Write new admin
     let mview = unsafe {
-        &mut *(accounts.admin_config as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.admin_config as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = mview.try_borrow_mut()?;
@@ -159,12 +159,11 @@ fn handle_initialize_extra_account_metas_list(
         ];
 
         accounts.system_program
-            .create_account(&accounts.payer, &*accounts.extra_account_metas_list, lamports, meta_list_size, &crate::ID)
+            .create_account(&accounts.payer, &accounts.extra_account_metas_list, lamports, meta_list_size, &crate::ID)
             .invoke_signed(&seeds)?;
 
         let view = unsafe {
-            &mut *(accounts.extra_account_metas_list as *const UncheckedAccount
-                as *mut UncheckedAccount as *mut AccountView)
+            &mut *(&mut accounts.extra_account_metas_list as *mut UncheckedAccount as *mut AccountView)
         };
         let mut data = view.try_borrow_mut()?;
         data[0..8].copy_from_slice(&EXECUTE_DISCRIMINATOR);
@@ -233,12 +232,12 @@ fn handle_switch(accounts: &mut Switch, on: bool) -> Result<(), ProgramError> {
         ];
         accounts
             .system_program
-            .create_account(&accounts.admin, &*accounts.wallet_switch, lamports, size, &crate::ID)
+            .create_account(&accounts.admin, &accounts.wallet_switch, lamports, size, &crate::ID)
             .invoke_signed(&switch_seeds)?;
     }
 
     let mview = unsafe {
-        &mut *(accounts.wallet_switch as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.wallet_switch as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = mview.try_borrow_mut()?;
