@@ -112,7 +112,7 @@ how much has been paid, and an oracle check.
 - **Keeper / liquidator.** Standard role — watches for
   undercollateralised positions and takes the bounty for closing them.
 
-### Worked example: shorting xNVDA via the lending market
+### Example: shorting xNVDA via the lending market
 
 Concrete numbers using assets that already trade on Solana —
 [xNVDA](https://www.backed.fi/) (a Backed Finance / xStocks tokenised
@@ -603,7 +603,7 @@ rent-exempt-lamport refunds going to the holder.
   - `InvalidLeaseStatus` if `status` is not `Listed` or `Active`
   - `LeaseNotExpired` if `status == Active` and `now < end_timestamp`
 
-### 3.8 Worked branch scenarios
+### 3.8 Branch scenarios
 
 The handlers above cover the happy path. The branch scenarios below
 walk the same machinery through liquidation, a falling-price profit,
