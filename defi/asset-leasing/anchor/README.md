@@ -24,12 +24,11 @@ need to sell short. The program is written in
 ## Table of contents
 
 1. [What does this program do?](#what-does-this-program-do)
-2. [Accounts and program-derived addresses](#accounts-and-program-derived-addresses)
-3. [Lifecycle](#lifecycle)
-4. [Safety and edge cases](#safety-and-edge-cases)
-5. [Running the tests](#running-the-tests)
-6. [Quasar port](#quasar-port)
-7. [Extending the program](#extending-the-program)
+2. [Lifecycle](#lifecycle)
+3. [Safety and edge cases](#safety-and-edge-cases)
+4. [Running the tests](#running-the-tests)
+5. [Quasar port](#quasar-port)
+6. [Extending the program](#extending-the-program)
 
 ---
 
@@ -205,38 +204,92 @@ above is the same machinery applied to a real asset pair.
 
 ---
 
-## Accounts and program-derived addresses
+## Lifecycle
 
-Every call to the program touches some subset of these accounts. The
-three [program-derived addresses](https://solana.com/docs/terminology)
-are created on `create_lease` and destroyed on `return_lease` /
-`liquidate` / `close_expired`.
+### What the short seller really gets
 
-### State / data accounts
+When a short seller takes a lease, they walk away with two things:
 
-- **`Lease`** - program-derived address with seeds `["lease", holder, lease_id]`. Data account owned by the program, holding all the lease parameters and current lifecycle state (see below).
+- **At open: today's market value of the leased tokens, in stables.**
+  They borrow the leased tokens from a holder, sell them on the open
+  market immediately, and pocket the stables.
+- **At close: an obligation to return the same number of tokens,
+  regardless of what those tokens are worth then.** The obligation
+  is fixed in *units of the leased token*, not in *units of value*.
+  If the price falls - say from $190 to $160 per token - the cost of
+  acquiring the same number of tokens to return drops, and the short
+  seller keeps the difference.
 
-### Token vaults
+The asymmetry is the trade: cash received today is fixed in stables;
+the cost of fulfilling the obligation later is fixed in tokens whose
+price is unknown. Bet correctly on the direction and that asymmetry
+prints money. Bet wrong and the cost of buying the tokens back can
+exceed the cash plus the collateral, at which point the keepers
+arrive (see [branch: position underwater - `liquidate`](#branch-position-underwater---liquidate)).
 
-- **`leased_vault`** - program-derived address with seeds `["leased_vault", lease]`. Token account whose authority is itself (program-derived-address-signed). Holds `leased_amount` while `Listed`; `0` while `Active` (the short seller has the tokens); full amount again briefly inside `return_lease`.
-- **`collateral_vault`** - program-derived address with seeds `["collateral_vault", lease]`. Token account whose authority is itself (program-derived-address-signed). Holds `0` while `Listed`; `collateral_amount` while `Active`, decreasing as lease fee streams out and increasing on `top_up_collateral`.
+### The holder lists the tokens - `create_lease`
 
-### User accounts passed in
+The holder calls `create_lease`, naming the leased mint, the
+collateral mint, the amount of leased tokens to offer, the
+collateral the short seller will have to post, the per-second lease
+fee, the duration, the maintenance-margin and liquidation-bounty
+ratios, and the Pyth `feed_id` the lease will be priced against.
+This is where every account the rest of the lifecycle uses gets
+created. The handler initialises three
+[program-derived addresses](https://solana.com/docs/terminology):
 
-- **`holder` wallet** (user-owned) - `create_lease` signer, receives the lease fee and final recovery.
-- **`short_seller` wallet** (user-owned) - `take_lease` / `top_up_collateral` / `return_lease` signer.
-- **`keeper` wallet** (user-owned) - `liquidate` signer, receives the bounty.
-- **`payer` wallet** (user-owned) - `pay_lease_fee` signer (can be anyone, not just the short seller).
-- **`holder_leased_account`** - holder's [associated token account](https://solana.com/docs/terminology) for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired`.
-- **`holder_collateral_account`** - holder's associated token account for the collateral mint; destination for the lease fee and liquidation proceeds.
-- **`short_seller_leased_account`** - short seller's associated token account for the leased mint; destination on `take_lease`, source on `return_lease`.
-- **`short_seller_collateral_account`** - short seller's associated token account for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease`.
-- **`keeper_collateral_account`** - keeper's associated token account for the collateral mint; receives the liquidation bounty.
-- **`price_update`** - `PriceUpdateV2` account owned by the Pyth Receiver program, for the feed the lease is pinned to.
+- **`Lease`** - the state account, owned by the program, holding all
+  the lease parameters and the current lifecycle status. Seeds:
+  `[b"lease", holder, lease_id.to_le_bytes()]` - keying on
+  `lease_id` lets one holder run many leases in parallel.
+- **`leased_vault`** - a token account for the leased mint whose
+  authority is itself (the program signs as the vault using the
+  vault's own seeds). Seeds: `[b"leased_vault", lease]`. Holds
+  `leased_amount` while `Listed`; `0` while `Active` (the short
+  seller has the tokens); the full amount again briefly inside
+  `return_lease`.
+- **`collateral_vault`** - a token account for the collateral mint,
+  also self-authoritative. Seeds: `[b"collateral_vault", lease]`.
+  Created empty here; filled by `take_lease`, drained over time as
+  lease fees stream out, and topped up by `top_up_collateral`.
 
-### Fields on `Lease`
+The handler then moves the leased tokens out of the holder's wallet
+into the leased vault. Locking the leased tokens up front means a
+short seller calling `take_lease` later cannot fail because the
+holder spent the inventory in the meantime - the atomicity guarantee
+transfers to the program the moment the lease is listed.
 
-From [`state/lease.rs`](programs/asset-leasing/src/state/lease.rs):
+- **Signers:** `holder` (the user wallet listing the tokens; receives
+  the lease fee and the final recovery).
+- **Accounts:**
+  - `holder` (signer, mut - pays account rent)
+  - `leased_mint`, `collateral_mint` (read-only)
+  - `holder_leased_account` (mut, holder's [associated token account](https://solana.com/docs/terminology) for the leased mint - source)
+  - `lease` (program-derived address, **init**) - created here, seeds `[b"lease", holder, lease_id.to_le_bytes()]`
+  - `leased_vault` (program-derived address, **init**, token account) - created here, seeds `[b"leased_vault", lease]`, authority = itself
+  - `collateral_vault` (program-derived address, **init**, token account) - created here, seeds `[b"collateral_vault", lease]`, authority = itself
+  - `token_program`, `system_program`
+- **What happens:**
+  - Single token movement: `leased_amount` of the leased mint
+    transfers from `holder_leased_account` to `leased_vault`.
+  - The `Lease` account is written with `status = Listed`,
+    `short_seller = Pubkey::default()`, `collateral_amount = 0`,
+    `start_timestamp = 0`, `end_timestamp = 0`,
+    `last_paid_timestamp = 0`, and the supplied parameters including
+    `feed_id`. All three bumps are stored.
+- **Errors:**
+  - `LeasedMintEqualsCollateralMint` if `leased_mint == collateral_mint`
+  - `InvalidLeasedAmount` if `leased_amount == 0`
+  - `InvalidCollateralAmount` if `required_collateral_amount == 0`
+  - `InvalidLeaseFeePerSecond` if `lease_fee_per_second == 0`
+  - `InvalidDuration` if `duration_seconds <= 0`
+  - `InvalidMaintenanceMargin` if `maintenance_margin_basis_points` is `0` or `> 50_000`
+  - `InvalidLiquidationBounty` if `liquidation_bounty_basis_points > 2_000`
+
+#### What's on the lease account
+
+The `Lease` account written above carries the full set of fields
+referenced by the rest of the lifecycle. From [`state/lease.rs`](programs/asset-leasing/src/state/lease.rs):
 
 ```rust
 pub struct Lease {
@@ -270,98 +323,28 @@ pub struct Lease {
 }
 ```
 
-The `Closed` and `Liquidated` states are not directly observable
-onchain: all three of `return_lease`, `liquidate` and `close_expired`
-close the `Lease` account in the same transaction (`close = holder`),
-returning the rent-exempt lamports to the holder. The in-memory
-`status` field is set *before* the close so the transaction logs
-record the terminal state, but the account disappears at the end.
-
----
-
-## Lifecycle
-
-### What the short seller really gets
-
-When a short seller takes a lease, they walk away with two things:
-
-- **At open: today's market value of the leased tokens, in stables.**
-  They borrow the leased tokens from a holder, sell them on the open
-  market immediately, and pocket the stables.
-- **At close: an obligation to return the same number of tokens,
-  regardless of what those tokens are worth then.** The obligation
-  is fixed in *units of the leased token*, not in *units of value*.
-  If the price falls - say from $190 to $160 per token - the cost of
-  acquiring the same number of tokens to return drops, and the short
-  seller keeps the difference.
-
-The asymmetry is the trade: cash received today is fixed in stables;
-the cost of fulfilling the obligation later is fixed in tokens whose
-price is unknown. Bet correctly on the direction and that asymmetry
-prints money. Bet wrong and the cost of buying the tokens back can
-exceed the cash plus the collateral, at which point the keepers
-arrive (see [branch: position underwater - `liquidate`](#branch-position-underwater---liquidate)).
-
-### The holder lists the tokens - `create_lease`
-
-The holder calls `create_lease`, naming the leased mint, the
-collateral mint, the amount of leased tokens to offer, the
-collateral the short seller will have to post, the per-second lease
-fee, the duration, the maintenance-margin and liquidation-bounty
-ratios, and the Pyth `feed_id` the lease will be priced against. The
-program creates the `Lease` account, creates two empty token vault
-[program-derived addresses](https://solana.com/docs/terminology) (one for each
-mint), and moves the leased tokens out of the holder's wallet into
-the leased vault. Locking the leased tokens up front means a short
-seller calling `take_lease` later cannot fail because the holder
-spent the inventory in the meantime - the atomicity guarantee
-transfers to the program the moment the lease is listed.
-
-- **Signers:** `holder`.
-- **Accounts:**
-  - `holder` (signer, mut - pays account rent)
-  - `leased_mint`, `collateral_mint` (read-only)
-  - `holder_leased_account` (mut, holder's [associated token account](https://solana.com/docs/terminology) for the leased mint - source)
-  - `lease` (program-derived address, **init**) - created here, seeds `[b"lease", holder, lease_id.to_le_bytes()]`
-  - `leased_vault` (program-derived address, **init**, token account) - created here, seeds `[b"leased_vault", lease]`, authority = itself
-  - `collateral_vault` (program-derived address, **init**, token account) - created here, seeds `[b"collateral_vault", lease]`, authority = itself
-  - `token_program`, `system_program`
-- **What happens:**
-  - Single token movement: `leased_amount` of the leased mint
-    transfers from `holder_leased_account` to `leased_vault`.
-  - The `Lease` account is written with `status = Listed`,
-    `short_seller = Pubkey::default()`, `collateral_amount = 0`,
-    `start_timestamp = 0`, `end_timestamp = 0`,
-    `last_paid_timestamp = 0`, and the supplied parameters including
-    `feed_id`. All three bumps are stored.
-- **Errors:**
-  - `LeasedMintEqualsCollateralMint` if `leased_mint == collateral_mint`
-  - `InvalidLeasedAmount` if `leased_amount == 0`
-  - `InvalidCollateralAmount` if `required_collateral_amount == 0`
-  - `InvalidLeaseFeePerSecond` if `lease_fee_per_second == 0`
-  - `InvalidDuration` if `duration_seconds <= 0`
-  - `InvalidMaintenanceMargin` if `maintenance_margin_basis_points` is `0` or `> 50_000`
-  - `InvalidLiquidationBounty` if `liquidation_bounty_basis_points > 2_000`
-
 ### The short seller takes the offer - `take_lease`
 
 A short seller who has spotted the `Lease` account onchain (via an
 indexer or a direct lookup) calls `take_lease` to take delivery. The
-program deposits the short seller's collateral first, then hands over
-the leased tokens - depositing collateral first means that if the
-leased-token payout fails for any reason the whole transaction
-reverts and the short seller gets their collateral back. The lease
-moves from `Listed` to `Active`.
+program deposits the short seller's collateral into `collateral_vault`
+first - the vault was created empty by `create_lease` and this is
+the call that fills it - then hands over the leased tokens.
+Depositing collateral first means that if the leased-token payout
+fails for any reason the whole transaction reverts and the short
+seller gets their collateral back. The lease moves from `Listed` to
+`Active`.
 
-- **Signers:** `short_seller`.
+- **Signers:** `short_seller` (the user wallet borrowing the tokens
+  and posting collateral).
 - **Accounts:**
   - `short_seller` (signer, mut)
   - `holder` (UncheckedAccount - read for program-derived address seed derivation only, no signature required)
   - `lease` (mut, `has_one = holder`, `has_one = leased_mint`, `has_one = collateral_mint`, must be `Listed`)
   - `leased_mint`, `collateral_mint`
   - `leased_vault`, `collateral_vault` (both mut, both program-derived addresses)
-  - `short_seller_collateral_account` (mut, short seller's associated token account - source)
-  - `short_seller_leased_account` (mut, **init_if_needed** - destination)
+  - `short_seller_collateral_account` (mut, short seller's associated token account for the collateral mint - source)
+  - `short_seller_leased_account` (mut, **init_if_needed** - short seller's associated token account for the leased mint, destination)
   - `token_program`, `associated_token_program`, `system_program`
 - **What happens:**
   - Two token movements, in order:
@@ -395,13 +378,14 @@ the vault. Fees do not accrue past `end_timestamp` - once the
 deadline hits, the short seller is either returning the tokens,
 being liquidated, or defaulting; no further lease fees are owed.
 
-- **Signers:** `payer` (anyone).
+- **Signers:** `payer` (any user wallet - the short seller, a
+  keeper bot, or anyone else willing to pay the transaction fee).
 - **Accounts:**
   - `payer` (signer, mut - pays for `init_if_needed` of the holder associated token account)
   - `holder` (UncheckedAccount, read-only - used for `has_one` check)
   - `lease` (mut, must be `Active`)
   - `collateral_mint`, `collateral_vault`
-  - `holder_collateral_account` (mut, **init_if_needed**)
+  - `holder_collateral_account` (mut, **init_if_needed** - holder's [associated token account](https://solana.com/docs/terminology) for the collateral mint, destination for the lease fee)
   - `token_program`, `associated_token_program`, `system_program`
 - **What happens:**
   - Compute `lease_fee_due = (min(now, end_timestamp) - last_paid_timestamp) * lease_fee_per_second`.
@@ -501,6 +485,15 @@ time at `end_timestamp`.
   - `Unauthorised` if `lease.short_seller != short_seller.key()`
   - `MathOverflow` if the lease-fee or collateral subtraction overflows
 
+`return_lease` is the first place an account-close happens; the same
+mechanism runs in `liquidate` and `close_expired`. The `Closed` and
+`Liquidated` states are not directly observable onchain: all three
+of `return_lease`, `liquidate` and `close_expired` close the `Lease`
+account in the same transaction (`close = holder`), returning the
+rent-exempt lamports to the holder. The in-memory `status` field is
+set *before* the close so the transaction logs record the terminal
+state, but the account disappears at the end.
+
 ### Branch: position underwater - `liquidate`
 
 If the leased asset rallies far enough that the locked collateral is
@@ -523,7 +516,9 @@ where `debt_value = leased_amount * price * 10^exponent`, with the
 Pyth exponent folded into whichever side of the inequality keeps the
 math non-negative (see [`is_underwater`](programs/asset-leasing/src/instructions/liquidate.rs)).
 
-- **Signers:** `keeper`.
+- **Signers:** `keeper` (any user wallet - typically a bot watching
+  for underwater positions; receives the bounty as payment for
+  cleaning up).
 - **Accounts:**
   - `keeper` (signer, mut - pays `init_if_needed` cost for both associated token accounts)
   - `holder` (UncheckedAccount, mut - receives lease fee, holder share, and the rent-exempt lamports from the three closed accounts)
@@ -531,8 +526,8 @@ math non-negative (see [`is_underwater`](programs/asset-leasing/src/instructions
   - `leased_mint`, `collateral_mint`
   - `leased_vault`, `collateral_vault` (both mut)
   - `holder_collateral_account` (mut, **init_if_needed**)
-  - `keeper_collateral_account` (mut, **init_if_needed**)
-  - `price_update` (UncheckedAccount, constrained to `owner = PYTH_RECEIVER_PROGRAM_ID`)
+  - `keeper_collateral_account` (mut, **init_if_needed** - keeper's [associated token account](https://solana.com/docs/terminology) for the collateral mint, destination for the bounty)
+  - `price_update` (UncheckedAccount, constrained to `owner = PYTH_RECEIVER_PROGRAM_ID`) - a `PriceUpdateV2` account owned by the Pyth Receiver program for the feed the lease was pinned to at creation. This is the first handler that requires the oracle account itself; `create_lease` only stores the `feed_id` it expects to see here.
   - `token_program`, `associated_token_program`, `system_program`
 - **What happens:**
   - Decode `price_update`: discriminator must match
