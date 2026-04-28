@@ -1,8 +1,24 @@
 # Asset Leasing
 
-A fixed-term token lease on Solana, with a second-by-second lease fee
-stream, a separate collateral deposit, and a Pyth-oracle-triggered
-seizure path when the collateral is no longer worth enough.
+**On-chain securities lending.** Long holders rent out fungible token
+inventory to short sellers. Borrowers post collateral, pay a
+second-by-second lending fee, and return equivalent tokens before
+expiry. If the borrowed asset rallies past the maintenance margin,
+keepers liquidate the position; if it falls, the borrower profits and
+returns equivalent tokens cheaply.
+
+This is the same primitive that underpins traditional securities
+lending: long inventory holders (exchange-traded funds and pension
+funds in traditional finance; passive holders on-chain) earn yield on
+assets they would hold anyway, and short sellers and arbitrageurs get
+the borrow they need. The program is written in Anchor; a parallel
+[Quasar port](#7-quasar-port) implements the same on-chain behaviour.
+
+The code uses `lessor` / `lessee` identifiers throughout — those names
+predate the framing change and stay as-is so the source is grep-able.
+The README freely uses **lender** for the lessor and **borrower** (or
+**short seller**) for the lessee; they refer to the same on-chain
+roles.
 
 Every instruction handler is walked through with the exact token
 movements it causes. If you already know what collateral, a
@@ -31,74 +47,62 @@ appear.
 
 ## 1. What does this program do?
 
-Two users, a **lessor** and a **lessee**, want to swap tokens
-temporarily:
-
-- The lessor has some number of tokens of mint **A** (call it the
-  "leased mint") they would like to hand over for a fixed period of
-  time.
-- The lessee has tokens of a different mint **B** (the "collateral
-  mint") they can lock up as a security deposit.
+A **lessor (lender)** offers some quantity of one fungible token —
+mint **A**, the "leased mint" — for a fixed term. A **lessee
+(borrower / short seller)** posts collateral in a different mint
+**B** — the "collateral mint" — to take delivery. The borrower will
+typically sell the A tokens immediately on a market like Jupiter, then
+re-acquire equivalent A tokens later to close out. Because mint A is
+fungible, the borrower only has to return the same *quantity*, not the
+exact units they received.
 
 The program acts as a non-custodial escrow. It:
 
-1. Takes the lessor's A tokens and locks them in a program-owned vault
-   until a lessee shows up.
-2. When a lessee calls `take_lease`, the program locks the lessee's B
-   tokens as collateral and hands the A tokens to the lessee.
-3. While the lease is live, a second-by-second **lease fee stream**
-   pays the lessor out of the collateral vault.
-4. If the price of A (measured in B) moves against the lessee far enough
-   that the locked collateral is no longer enough to cover the cost of
-   re-acquiring the leased tokens, anyone can call `liquidate` — the
-   collateral is seized, most of it goes to the lessor, and a small
-   percentage (the **liquidation bounty**) goes to whoever called it.
-   Such a caller is known as a **keeper** — a bot or anyone else who
-   watches the chain for positions that have gone underwater and earns
-   the bounty by cleaning them up.
-5. If the lessee returns the full A amount before the deadline, they get
-   back whatever collateral is left after lease fees.
-6. If the lessee ghosts past the deadline without returning anything,
-   the lessor calls `close_expired` and sweeps the collateral as
-   compensation.
+1. Takes the lender's A tokens and locks them in a program-owned vault
+   until a borrower shows up.
+2. When a borrower calls `take_lease`, the program locks the
+   borrower's B tokens as collateral and hands the A tokens to the
+   borrower.
+3. While the loan is live, a second-by-second **lending fee stream**
+   pays the lender out of the collateral vault.
+4. If the price of A (measured in B) rises far enough that the locked
+   collateral is no longer enough to cover the cost of re-acquiring
+   the borrowed tokens, anyone can call `liquidate` — the collateral
+   is seized, most of it goes to the lender, and a small percentage
+   (the **liquidation bounty**) goes to whoever called it. Such a
+   caller is known as a **keeper** — a bot or anyone else who watches
+   the chain for positions that have gone underwater and earns the
+   bounty by cleaning them up.
+5. If the borrower returns the full A amount before the deadline, they
+   get back whatever collateral is left after lending fees.
+6. If the borrower ghosts past the deadline without returning
+   anything, the lender calls `close_expired` and sweeps the
+   collateral as compensation.
 
 The trigger for step 4 is the **maintenance margin**: a ratio,
-expressed in basis points (1 bp = 1/100 of a percent), of required
-collateral value to debt value. `maintenance_margin_basis_points = 12_000` is
-120%, meaning the collateral must stay worth at least 1.2× the leased
-tokens. Drop below and the position becomes liquidatable.
+expressed in basis points (1 basis point = 1/100 of a percent), of
+required collateral value to debt value.
+`maintenance_margin_basis_points = 12_000` is 120%, meaning the
+collateral must stay worth at least 1.2× the borrowed tokens. Drop
+below and the position becomes liquidatable.
 
 The program is a pair of vaults, a small piece of state that tracks
-how much has been paid, and an oracle check. It is written in Anchor.
+how much has been paid, and an oracle check.
 
-### The tradfi picture, briefly
+### Roles
 
-Two analogies from finance for the uninitiated; the on-chain mechanics
-above are the canonical description.
+- **Lessor / lender.** Long the asset, willing to part with it
+  temporarily to earn the lending fee. The economic match for this
+  role is a passive holder — someone who would hold the asset anyway
+  and is happy to earn yield on idle inventory.
+- **Lessee / borrower / short seller.** Pays the lending fee for the
+  right to sell the borrowed tokens now and buy them back later. The
+  payoff shape is the same as a short: profit if the borrowed asset
+  falls, loss (and possible liquidation) if it rises.
+- **Keeper / liquidator.** Standard role — watches for
+  undercollateralised positions and takes the bounty for closing them.
 
-- **Leasing gold bars from a bullion dealer.** The dealer hands over a
-  fixed amount of physical gold for a fixed period; the counterparty
-  pays a per-day leasing fee and posts cash collateral worth more than
-  the gold. If the gold price rises enough that the posted cash no
-  longer covers the value of the bars, the dealer can seize the cash
-  before the position goes further underwater. The leased tokens here
-  play the role of the gold; the collateral plays the role of the cash;
-  the oracle plays the role of a live gold price feed.
-
-- **Securities lending — borrowing stock to short.** A broker lends
-  shares (say, NVIDIA) to a short seller for a fee. The short seller
-  posts cash collateral worth more than the shares. If NVIDIA rallies,
-  the collateral ratio falls; if it falls far enough, the broker issues
-  a margin call and, if unmet, liquidates the position by buying back
-  the shares from the collateral. This program's `liquidate`
-  instruction handler is the on-chain equivalent of that forced
-  buy-back.
-
-Neither analogy is exact — real bullion leases and real securities
-lending add features the program doesn't model (recall rights, rebate
-rates, haircuts).
-
-### Worked example: leasing xNVDA against USDC
+### Worked example: shorting xNVDA via the lending market
 
 Concrete numbers using assets that already trade on Solana —
 [xNVDA](https://www.backed.fi/) (a Backed Finance / xStocks tokenised
@@ -106,9 +110,9 @@ NVIDIA share) and USDC. xNVDA has its own Pyth feed; the program
 takes the feed id verbatim at `create_lease`.
 
 Alice holds 100 xNVDA at ~$180 / share, ~$18 000 notional. She wants
-yield without selling the underlying.
+yield on inventory she would hold anyway.
 
-Bob wants short exposure to NVIDIA without using a perp.
+Bob wants short exposure to NVIDIA without using a perpetual future.
 
 Alice lists the lease (assume USDC is 6-decimal, xNVDA is also
 6-decimal for round numbers):
@@ -151,11 +155,11 @@ sells them on Jupiter for ~18 000 USDC at the spot price.
   accrued lease fee. The remaining ~22 000 USDC (minus fees paid)
   refunds to Bob.
 - Bob's profit ≈ `$18 000 − $16 000 − fees − trading costs ≈ $2 000`
-  minus carry — the same payoff shape as a 30-day short on NVIDIA.
+  minus carry. This is a 30-day short on NVIDIA, expressed on-chain.
 
-The asymmetry: liquidation only ever fires when the *leased* asset
-rallies against the collateral. A drop in the leased asset price is
-purely beneficial to the lessee. The streaming lease fee is the
+The asymmetry: liquidation only ever fires when the *borrowed* asset
+rallies against the collateral. A drop in the borrowed asset price is
+purely beneficial to the borrower. The streaming lending fee is the
 position's only ongoing cost in either direction.
 
 §4 walks the on-chain token flows for each path with abstract numbers
@@ -680,11 +684,14 @@ closed; all three rent-exempt lamport refunds go to the lessor.
 
 ## 4. Full-lifecycle worked examples
 
-All three use the same starting numbers so the arithmetic is easy to
-follow. Both mints are 6-decimal tokens, so 1 token = 1 000 000 base
-units. Throughout this section, "leased units" means base units of
-the leased mint and "collateral units" means base units of the
-collateral mint — they are descriptive labels, not real tickers.
+These are abstract walkthroughs of the same machinery the §1 xNVDA
+example uses, with round numbers chosen to make the arithmetic easy
+to follow and to match the LiteSVM tests one-to-one. All paths share
+the same starting parameters. Both mints are 6-decimal tokens, so
+1 token = 1 000 000 base units. Throughout this section, "leased
+units" means base units of the leased mint and "collateral units"
+means base units of the collateral mint — they are descriptive
+labels, not real tickers.
 The diagrams use the same convention: `[<number> leased]` and
 `[<number> collateral]`.
 
@@ -802,14 +809,13 @@ Same setup. Steps 1 and 2 run identically.
 tokens. The collateral pays the lessor for the lost asset. The lessee
 has effectively bought the leased tokens at the forfeit price.)
 
-### 4.3 Falling-price path — lessee benefits
+### 4.3 Falling-price path — borrower profits
 
 Liquidation is a one-sided risk: it only ever fires when the leased
 asset *appreciates* against the collateral. If the leased asset
-depreciates, the collateral ratio rises and the lessee's position
-gets safer. Mechanically the position behaves like a short on the
-leased asset — gains accrue to the lessee, the only ongoing cost is
-the streaming lease fee.
+depreciates, the collateral ratio rises and the borrower's position
+gets safer. The streaming lending fee is the position's only ongoing
+cost.
 
 Same setup. Steps 1 and 2 run identically.
 
@@ -844,18 +850,16 @@ Same setup. Steps 1 and 2 run identically.
 
 - Lessor: 1 000 000 000 leased units (full return), 6 000 collateral units in lease
   fees.
-- Lessee: 100 000 000 leased units received → bought 100 leased tokens
-  back at the lower price → returned them. Their net cost is the
-  lease fee (6 000 collateral units) plus whatever
-  they paid on the open market for the replacement leased tokens;
-  their gain is the difference between what they originally received
-  the leased tokens at versus what they paid to re-acquire them.
+- Lessee: received 100 000 000 leased units, sold them at the
+  original price, bought 100 leased tokens back at the lower price,
+  returned them. Net cost is the lending fee (6 000 collateral units)
+  plus whatever they paid on the open market for the replacement
+  tokens; gain is the difference between the original sale price and
+  the buy-back price. The standard short payoff.
 
-This is the same payoff shape as a short on the leased asset: the
-lessee profits from price drops and pays a small carry (the lease
-fee) for the duration. Only adverse moves trigger liquidation, and
-the lessee can defend a borderline position with `top_up_collateral`
-or close it early via `return_lease`.
+The borrower can defend a borderline position with
+`top_up_collateral` or close it early via `return_lease`. Only
+adverse price moves trigger liquidation.
 
 ### 4.4 Default / expiry path — `close_expired` on an `Active` lease
 
