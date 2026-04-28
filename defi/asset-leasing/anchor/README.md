@@ -97,7 +97,12 @@ deadline has passed, and the short seller hasn't returned the tokens -
 in which case the holder seizes the entire collateral as compensation
 for the missing tokens.
 
-The program acts as a non-custodial escrow. It:
+The program acts as the escrow agent. Both the leased tokens and
+the collateral sit in program-owned vaults during the lease, and the
+program-derived address signs all the transfers in and out. There is
+no admin key and no off-program logic that can move funds: every
+transfer is dictated by the rules below, and those rules are the
+deployed bytecode. Specifically:
 
 1. Takes the holder's A tokens and locks them in a program-owned
    vault until a short seller shows up.
