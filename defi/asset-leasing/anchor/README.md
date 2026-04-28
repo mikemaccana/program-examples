@@ -43,14 +43,22 @@ tokens.
 The short seller's full lifecycle is:
 
 1. **Open the position** by calling `take_lease`. This borrows A from
-   the holder and locks B as collateral. A per-second lending fee
-   accrues from this point onward, settled by `pay_lease_fee`.
+   the holder and locks B as collateral. From this point on, a
+   per-second lending fee accrues against the locked collateral. The
+   fee is computed on demand: the program tracks
+   `last_paid_timestamp` and `lease_fee_per_second` on the lease
+   account, multiplies by elapsed seconds whenever any handler runs,
+   and debits the result from the collateral. Nothing happens onchain
+   each second - the fee is just a number that grows until someone
+   pokes the lease.
 2. **Sell A immediately** on a market like Jupiter, receiving more B
    in return. The short seller now has more B and owes A.
 3. **Wait.** They are betting A's price (denominated in B) will fall.
-   While waiting, they may call `top_up_collateral` to defend the
-   position if A's price moves against them, and `pay_lease_fee` to
-   settle accrued fees.
+   The short seller doesn't have to call anything while they wait -
+   accrued fees auto-settle at close. They can optionally call
+   `pay_lease_fee` to settle the running balance early (so the fee
+   doesn't eat into their collateral cushion), and `top_up_collateral`
+   to add more collateral if A's price moves against them.
 4. **Close the position** by calling `return_lease`. They buy A back
    on the open market - hopefully at a lower price than they sold it
    for - and return the same quantity of A to the holder. The B they
