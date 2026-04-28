@@ -165,9 +165,9 @@ rallies against the collateral. A drop in the borrowed asset price is
 purely beneficial to the short seller. The streaming lending fee is
 the position's only ongoing cost in either direction.
 
-§3 walks each instruction handler with concrete numbers that match
-the LiteSVM tests; the xNVDA example above is the same machinery
-applied to a real asset pair.
+[Section 3 (Lifecycle)](#3-lifecycle) walks each instruction handler
+with concrete numbers that match the LiteSVM tests; the xNVDA example
+above is the same machinery applied to a real asset pair.
 
 ### Production deviations to know
 
@@ -176,7 +176,7 @@ applied to a real asset pair.
   inline in `liquidate.rs`. Production code would depend on the
   `pyth-solana-receiver-sdk` crate so layout changes are caught at
   compile time.
-- See §4 for the rest of the deliberate simplifications.
+- See [Section 4 (Safety and edge cases)](#4-safety-and-edge-cases) for the rest of the deliberate simplifications.
 
 ---
 
@@ -387,8 +387,9 @@ being liquidated, or defaulting; no further lease fees are owed.
     `lease.last_paid_timestamp = min(now, end_timestamp)`.
   - If the vault did not have enough collateral to cover the full
     `lease_fee_due`, the residual is silently left as a debt the next
-    `liquidate` or `close_expired` call cleans up. (See §4 for the
-    rationale on this trade-off.)
+    `liquidate` or `close_expired` call cleans up. (See
+    [Section 4 (Safety and edge cases)](#4-safety-and-edge-cases) for
+    the rationale on this trade-off.)
 - **Errors:**
   - `InvalidLeaseStatus` if the lease is not `Active`
   - `MathOverflow` if `elapsed * lease_fee_per_second` overflows `u64`
@@ -614,7 +615,7 @@ Shared starting parameters:
 The holder starts with 1 000 000 000 leased units; the short seller
 starts with 1 000 000 000 collateral units. Each scenario opens with
 `create_lease` and (where relevant) `take_lease` running as described
-in §3.1 and §3.2. Lease fees use the formula in §3.3.
+in [§3.1](#31-the-holder-lists-the-tokens---create_lease) and [§3.2](#32-the-short-seller-takes-the-offer---take_lease). Lease fees use the formula in [§3.3](#33-the-lease-fee-streams---pay_lease_fee).
 
 #### 3.8.1 Liquidation - leased asset rallies
 
@@ -629,7 +630,7 @@ pot of ~200 000 000 - maintenance ratio is `200/400 = 50%`, far below
 the required 120%. The keeper does not need to call `pay_lease_fee`
 first; `liquidate` settles accrued fees itself.
 
-The keeper calls `liquidate` (mechanics in §3.6). At `T + 300`:
+The keeper calls `liquidate` (mechanics in [§3.6](#36-branch-position-underwater---liquidate)). At `T + 300`:
 
 - Accrued lease fee: `300 × 10 = 3_000` collateral units. The vault
   has 200 000 000, so `lease_fee_payable = 3_000` flows to the holder.
@@ -668,7 +669,7 @@ a healthy position.
 At `T + 600` (10 minutes in) the short seller buys 100 leased tokens
 on the open market at the new price (about 50 collateral tokens
 total - far less than the 200 they posted) and calls `return_lease`
-(mechanics in §3.5). Accrued lease fees are `600 × 10 = 6_000`
+(mechanics in [§3.5](#35-the-short-seller-closes---return_lease)). Accrued lease fees are `600 × 10 = 6_000`
 collateral units. The settlement:
 
 - 100 000 000 leased units flow short seller → leased vault → holder.
@@ -689,8 +690,8 @@ Final balances:
   payoff.
 
 The short seller can defend a borderline position with
-`top_up_collateral` (§3.4) or close it early via `return_lease`
-(§3.5). Only adverse price moves trigger liquidation.
+`top_up_collateral` ([§3.4](#34-the-short-seller-defends-the-position---top_up_collateral)) or close it early via `return_lease`
+([§3.5](#35-the-short-seller-closes---return_lease)). Only adverse price moves trigger liquidation.
 
 #### 3.8.3 Default - `close_expired` on an `Active` lease
 
@@ -700,7 +701,7 @@ is never called. The clock advances past
 `end_timestamp = T + 86_400`.
 
 At `T + 100_000` the holder calls `close_expired` (mechanics in
-§3.7). Because `status == Active` and `now >= end_timestamp`, the
+[§3.7](#37-branch-cancel-or-default---close_expired)). Because `status == Active` and `now >= end_timestamp`, the
 default branch runs:
 
 - `leased_vault` is empty (the short seller kept the tokens) - no
@@ -722,7 +723,7 @@ Final balances:
 
 The cheap cancel path. `create_lease` runs; no short seller ever
 calls `take_lease`. The holder calls `close_expired` immediately
-(mechanics in §3.7). Because `status == Listed`, no expiry check
+(mechanics in [§3.7](#37-branch-cancel-or-default---close_expired)). Because `status == Listed`, no expiry check
 applies:
 
 - `leased_vault` holds 100 000 000 leased units; all of it drains
