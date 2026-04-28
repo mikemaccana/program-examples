@@ -252,28 +252,6 @@ pub struct Lease {
 }
 ```
 
-### Lifecycle diagram
-
-```
-                  create_lease
-               +---------------+
- (no lease) -> |    Listed     |
-               +---------------+
-                 |          |
-      take_lease |          | close_expired (holder cancels)
-                 v          v
-               +---------------+       +--------+
-               |    Active     | ----> | Closed |
-               +---------------+       +--------+
-                 |    |       |
-     return_lease|    |       | close_expired (after end_timestamp)
-                 |    | liquidate
-                 v    v       v
-             +--------+ +-----------+
-             | Closed | | Liquidated|
-             +--------+ +-----------+
-```
-
 The `Closed` and `Liquidated` states are not directly observable
 onchain: all three of `return_lease`, `liquidate` and `close_expired`
 close the `Lease` account in the same transaction (`close = holder`),
