@@ -1,14 +1,15 @@
 # Asset Leasing
 
 **Directional token lending.** **Holders** rent out token inventory
-to **short sellers**. The short seller posts collateral, takes
-delivery of the borrowed tokens, and immediately sells them on the
-open market. They pay a second-by-second lending fee while the
-position is open, then buy equivalent tokens back later and return
-them to the holder. If the price falls between the sell and the
-re-buy, the short seller profits on the difference; if the price
-rallies far enough that their collateral falls below the maintenance
-margin, keepers liquidate the position.
+to **short sellers**. The short seller posts collateral in a stable
+asset (e.g. USDC) and borrows the asset they want to short (e.g.
+xNVDA). They immediately sell the borrowed xNVDA on the open market
+for more USDC, pay a second-by-second lending fee while the position
+is open, and later buy equivalent xNVDA back to return to the
+holder. If xNVDA's price falls between the sell and the re-buy, the
+short seller pockets the difference in USDC; if xNVDA rallies far
+enough that their collateral no longer covers the cost of buying it
+back, keepers liquidate the position.
 
 This is the same primitive that underpins traditional securities
 lending in TradFi: holders earn yield on inventory they would hold
