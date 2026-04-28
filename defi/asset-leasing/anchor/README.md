@@ -262,24 +262,26 @@ record the terminal state, but the account disappears at the end.
 
 ## 3. Lifecycle
 
-This section walks the program from listing to close. Each
-[instruction handler](https://solana.com/docs/terminology) is
-introduced in narrative order; the first time a handler appears, its
-full mechanics are listed inline (signers, accounts, what happens,
-errors). After the happy path is covered, two branch handlers —
-`liquidate` and `close_expired` — handle the failure modes. The
-section ends with four worked branch scenarios using concrete numbers
-that match the LiteSVM tests one-to-one.
+### What the short seller really gets
 
-The program has seven instruction handlers in total:
+When a short seller takes a lease, they walk away with two things:
 
-- `create_lease` — holder lists tokens
-- `take_lease` — short seller takes the offer
-- `pay_lease_fee` — settle accrued lease fee
-- `top_up_collateral` — short seller adds collateral
-- `return_lease` — short seller closes cleanly
-- `liquidate` — keeper closes an underwater position
-- `close_expired` — holder closes a stale or defaulted lease
+- **At open: today's market value of the leased tokens, in stables.**
+  They borrow the leased tokens from a holder, sell them on the open
+  market immediately, and pocket the stables.
+- **At close: an obligation to return the same number of tokens,
+  regardless of what those tokens are worth then.** The obligation
+  is fixed in *units of the leased token*, not in *units of value*.
+  If the price falls — say from $190 to $160 per token — the cost of
+  acquiring the same number of tokens to return drops, and the short
+  seller keeps the difference.
+
+The asymmetry is the trade: cash received today is fixed in stables;
+the cost of fulfilling the obligation later is fixed in tokens whose
+price is unknown. Bet correctly on the direction and that asymmetry
+prints money. Bet wrong and the cost of buying the tokens back can
+exceed the cash plus the collateral, at which point the keepers
+arrive (see [§3.6](#36-branch-position-underwater---liquidate)).
 
 ### 3.1 The holder lists the tokens — `create_lease`
 
