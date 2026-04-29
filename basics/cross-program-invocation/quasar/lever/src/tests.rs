@@ -47,10 +47,19 @@ fn build_initialize() -> Vec<u8> {
 }
 
 /// Build switch_power instruction data (discriminator = 1).
-/// Wire format: [disc=1] [name: String]
+///
+/// Wire format: [discriminator = 1] [name: u8 length prefix + bytes].
+///
+/// The lever's switch_power instruction takes `String<50>`, which Quasar
+/// serialises with a single-byte length prefix (matching every other
+/// Quasar program: account-data, close-account, rent, realloc,
+/// repository-layout). An earlier version of this builder used a u32
+/// length prefix, which produced a malformed payload that happened to
+/// pass because the handler ignored the deserialised name.
 fn build_switch_power(name: &str) -> Vec<u8> {
-    let mut data = vec![1u8]; // discriminator = 1
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    let mut data = Vec::with_capacity(2 + name.len());
+    data.push(1u8); // discriminator = 1
+    data.push(name.len() as u8);
     data.extend_from_slice(name.as_bytes());
     data
 }
@@ -104,6 +113,12 @@ fn test_switch_power_on() {
     let logs = result.logs.join("\n");
     assert!(logs.contains("pulling the power switch"), "should log switch");
     assert!(logs.contains("now on"), "should say power is on");
+    // Verifies wire format: a stale u32 length prefix would corrupt the
+    // deserialised name (e.g. "\0\0\0Al" instead of "Alice").
+    assert!(
+        logs.contains("Alice"),
+        "deserialised name should round-trip exactly; logs: {logs}"
+    );
 
     let account = result.account(&power_addr).unwrap();
     assert_eq!(account.data[1], 1, "power should now be on");
@@ -128,6 +143,10 @@ fn test_switch_power_off() {
 
     let logs = result.logs.join("\n");
     assert!(logs.contains("now off"), "should say power is off");
+    assert!(
+        logs.contains("Bob"),
+        "deserialised name should round-trip exactly; logs: {logs}"
+    );
 
     let account = result.account(&power_addr).unwrap();
     assert_eq!(account.data[1], 0, "power should now be off");

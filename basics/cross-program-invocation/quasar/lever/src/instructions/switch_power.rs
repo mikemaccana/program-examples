@@ -5,19 +5,24 @@ use {
 
 /// Accounts for toggling the power switch.
 #[derive(Accounts)]
-pub struct SwitchPower<'info> {
+pub struct SwitchPower {
     #[account(mut)]
-    pub power: &'info mut Account<PowerStatus>,
+    pub power: Account<PowerStatus>,
 }
 
 #[inline(always)]
-pub fn handle_switch_power(accounts: &mut SwitchPower, _name: &str) -> Result<(), ProgramError> {
+pub fn handle_switch_power(accounts: &mut SwitchPower, name: &str) -> Result<(), ProgramError> {
     let current: bool = accounts.power.is_on.into();
     let new_state = !current;
     accounts.power.is_on = PodBool::from(new_state);
 
     // Quasar's log() takes &str — no format! in no_std.
+    // Logging the name verifies the wire format end-to-end: a stale u32
+    // length prefix would surface here as a corrupted name (e.g. the
+    // first three bytes parsed as zeros, leaving "\0\0\0Al" instead of
+    // "Alice").
     log("Someone is pulling the power switch!");
+    log(name);
 
     if new_state {
         log("The power is now on.");

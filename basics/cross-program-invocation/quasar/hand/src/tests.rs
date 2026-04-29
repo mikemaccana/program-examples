@@ -30,10 +30,17 @@ fn power_account(address: Pubkey, is_on: bool) -> Account {
 }
 
 /// Build pull_lever instruction data (discriminator = 0).
-/// Wire format: [disc=0] [name: String]
+///
+/// Wire format: [discriminator = 0] [name: u8 length prefix + bytes].
+///
+/// The hand's pull_lever instruction takes `String<50>`, which Quasar
+/// serialises with a single-byte length prefix. The CPI builder in
+/// `pull_lever.rs` re-serialises the same name into the lever's
+/// instruction data using the same u8 prefix.
 fn build_pull_lever(name: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    let mut data = Vec::with_capacity(2 + name.len());
+    data.push(0u8); // discriminator = 0
+    data.push(name.len() as u8);
     data.extend_from_slice(name.as_bytes());
     data
 }
@@ -72,6 +79,14 @@ fn test_pull_lever_turns_on() {
     assert!(logs.contains("Hand is pulling"), "hand should log");
     assert!(logs.contains("pulling the power switch"), "lever should log");
     assert!(logs.contains("now on"), "power should turn on");
+    // Verifies the CPI wire format: the lever logs the name it
+    // deserialised. A stale u32 length prefix on either the inbound
+    // `pull_lever` payload or the CPI to `switch_power` would corrupt
+    // this (e.g. "\0\0\0Al" instead of "Alice").
+    assert!(
+        logs.contains("Alice"),
+        "name should round-trip through hand → lever CPI; logs: {logs}"
+    );
 
     let account = result.account(&power_addr).unwrap();
     assert_eq!(account.data[1], 1, "power should be on");
@@ -107,6 +122,10 @@ fn test_pull_lever_turns_off() {
 
     let logs = result.logs.join("\n");
     assert!(logs.contains("now off"), "power should turn off");
+    assert!(
+        logs.contains("Bob"),
+        "name should round-trip through hand → lever CPI; logs: {logs}"
+    );
 
     let account = result.account(&power_addr).unwrap();
     assert_eq!(account.data[1], 0, "power should be off");

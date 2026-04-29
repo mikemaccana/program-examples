@@ -15,24 +15,27 @@ pub struct PullLever {
 pub fn handle_pull_lever(accounts: &PullLever, name: &str) -> Result<(), ProgramError> {
     log("Hand is pulling the lever!");
 
-    // Build the switch_power instruction data for the lever program:
-    //   [disc=1] [name: u32 len + bytes]
-    // 128 bytes is enough for any reasonable name.
+    // Build the switch_power instruction data for the lever program.
+    //
+    // Wire format: [discriminator = 1] [name: u8 length prefix + bytes].
+    //
+    // The lever's switch_power instruction takes `String<50>`, which Quasar
+    // serialises with a single-byte length prefix (matching every other
+    // Quasar program: account-data, close-account, rent, realloc,
+    // repository-layout). An earlier version of this builder used a u32
+    // length prefix, which sent a malformed payload on every CPI call.
+    //
+    // 128 bytes is enough for any reasonable name (max 50 + 1 + 1 = 52).
     let mut data = [0u8; 128];
     let name_bytes = name.as_bytes();
-    let data_len = 1 + 4 + name_bytes.len();
+    let data_len = 1 + 1 + name_bytes.len();
 
     data[0] = 1;
-
-    let len_bytes = (name_bytes.len() as u32).to_le_bytes();
-    data[1] = len_bytes[0];
-    data[2] = len_bytes[1];
-    data[3] = len_bytes[2];
-    data[4] = len_bytes[3];
+    data[1] = name_bytes.len() as u8;
 
     let mut i = 0;
     while i < name_bytes.len() {
-        data[5 + i] = name_bytes[i];
+        data[2 + i] = name_bytes[i];
         i += 1;
     }
 
