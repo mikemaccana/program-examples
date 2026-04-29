@@ -1025,7 +1025,7 @@ The Quasar example in this repo's CI workflow
   Token-2022 support is a type-parameter swap away.
 
 - **State layout is the same, byte for byte.** The `Lease` discriminator
-  and field order match the Anchor version, so an off-chain indexer
+  and field order match the Anchor version, so an offchain indexer
   that already decodes Anchor `Lease` accounts would also decode the
   Quasar ones after adjusting for the one-byte discriminator.
 
@@ -1038,7 +1038,7 @@ The Quasar example in this repo's CI workflow
   keys its program-derived address on `[LEASE_SEED, holder]` alone -
   one active lease per holder. The `lease_id` is still stored on the
   `Lease` account for book-keeping and is a caller-supplied u64 in
-  `create_lease`; the off-chain client just has to ensure the previous
+  `create_lease`; the offchain client just has to ensure the previous
   lease from the same holder is `Closed` or `Liquidated` (i.e. its
   program-derived address account is gone) before creating a new one.
   Swapping in a multi-lease seed is a mechanical change once Quasar
@@ -1058,7 +1058,7 @@ grouped by effort:
 
 ### Easy
 
-- **Add a `lease_view` read-only helper.** An off-chain indexer-style
+- **Add a `lease_view` read-only helper.** An offchain indexer-style
   struct that returns `{ collateral_value, debt_value, ratio_basis_points,
   is_underwater }` given the same inputs `is_underwater` uses. Useful
   for UIs that want to show "you are 15% away from liquidation".
@@ -1080,7 +1080,7 @@ grouped by effort:
 - **Multiple outstanding leases per `(holder, short_seller)` pair with
   the same mint pair.** Already supported via `lease_id`, but add an
   instruction-level index account that lists open lease ids for a
-  given holder so off-chain tools don't have to `getProgramAccounts`
+  given holder so offchain tools don't have to `getProgramAccounts`
   scan.
 
 - **Quote asset ≠ collateral mint.** Rent and liquidation math assume
