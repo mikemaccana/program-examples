@@ -51,7 +51,14 @@ The short seller's full lifecycle is:
    each second - the fee is just a number that grows until someone
    pokes the lease.
 2. **Sell A immediately** on a market like Jupiter, receiving more B
-   in return. The short seller now has more B and owes A.
+   in return. The short seller now has more B and owes A. The
+   asset-leasing program does not perform this swap itself; that is
+   the DEX's job, and keeping the two concerns separate keeps each
+   program narrow and composable. In practice a frontend bundles
+   `take_lease` and the Jupiter swap into a single transaction so
+   the short seller signs once and the open-short flow is atomic
+   (Solana's transaction atomicity guarantees both succeed or both
+   revert).
 3. **Wait.** They are betting A's price (denominated in B) will fall.
    The short seller doesn't have to call anything while they wait -
    accrued fees auto-settle at close. They can optionally call
