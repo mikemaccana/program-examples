@@ -24,11 +24,12 @@ need to sell short. The program is written in
 ## Table of contents
 
 1. [What does this program do?](#what-does-this-program-do)
-2. [Lifecycle](#lifecycle)
-3. [Safety and edge cases](#safety-and-edge-cases)
-4. [Running the tests](#running-the-tests)
-5. [Quasar port](#quasar-port)
-6. [Extending the program](#extending-the-program)
+2. [Bilateral versus pooled lending](#bilateral-versus-pooled-lending)
+3. [Lifecycle](#lifecycle)
+4. [Safety and edge cases](#safety-and-edge-cases)
+5. [Running the tests](#running-the-tests)
+6. [Quasar port](#quasar-port)
+7. [Extending the program](#extending-the-program)
 
 ---
 
@@ -213,6 +214,58 @@ above is the same machinery applied to a real asset pair.
   `pyth-solana-receiver-sdk` crate so layout changes are caught at
   compile time.
 - See [safety and edge cases](#safety-and-edge-cases) for the rest of the deliberate simplifications.
+
+---
+
+## Bilateral versus pooled lending
+
+Our program could be redesigned to use pooled lending, like Kamino,
+MarginFi, and other programs where many depositors share one
+liquidity pool that borrowers draw from against collateral, with
+rates set automatically by a utilisation curve. That design works
+well for some assets and poorly for others. We chose bilateral
+lending - direct deals between one holder and one short seller - and
+it's worth explaining why.
+
+Pooled lending already supports shorting tokens. A short seller
+deposits collateral, borrows the asset, sells it, buys it back later,
+and repays the loan. So the question isn't whether pooled lending
+*can* facilitate shorts. It can. The question is which structure is
+the right tool for which market.
+
+For deep, liquid assets such as SOL, USDC, and the majors, pooled
+lending is the right tool. Capital is efficient, fills are instant,
+and pricing adjusts automatically as borrowing demand changes.
+
+Bilateral lending wins where pooled lending breaks down:
+
+- **Bilateral terms.** Holder and short seller agree on a fixed
+  duration, fixed lease fee, and a custom collateral schedule.
+  Pooled lending forces every borrower onto one rate model and
+  offers no end date. Borrowers face open-ended exposure to rate
+  spikes and margin calls. Bilateral lending gives both sides
+  predictability.
+- **Pool rates spike when supply is thin.** Pool interest rates rise
+  gently as borrowing demand grows, then spike sharply once most of
+  the supply is in use. For lightly supplied assets, this makes
+  shorting punitive and unstable. Bilateral lending prices through
+  direct negotiation, so the rate is whatever holder and short
+  seller agree on.
+- **Holder control over supply.** In a pool, the holder is one of
+  many depositors; the program commingles deposits and decides how
+  they get used. In bilateral lending, the holder chooses which
+  short seller borrows their tokens and on what terms. They can
+  refuse, charge a premium, or restrict to specific counterparties.
+- **Long-tail and new tokens.** A token with no pooled-lending
+  market cannot be shorted through pooled lending. Bilateral lending
+  works on day one with one holder and one short seller, in markets
+  of size n=1.
+
+If your target asset is a major liquid token with deep existing
+pooled-lending markets, redesigning around a pool is reasonable. If
+your target is anything else - a thinly-supplied token, a token
+where holders care who borrows from them, or a token where both
+sides want fixed terms - bilateral lending is the better fit.
 
 ---
 
