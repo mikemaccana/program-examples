@@ -34,9 +34,6 @@ tokens/token-extensions/group/quasar
 # CPI quasar project uses subdirectories (hand/ and lever/) instead of a root Quasar.toml
 basics/cross-program-invocation/quasar
 
-# has Cargo.toml but no Quasar.toml
-tokens/token-swap/quasar
-
 # build failed - outdated quasar-lang API (no AccountView.data, no log_64)
 oracles/pyth/quasar
 
